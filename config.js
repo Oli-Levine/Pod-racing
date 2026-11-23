@@ -158,6 +158,21 @@ export const CONFIG = {
     outMargin: 6,            // [live] m beyond the wall line that counts as out of bounds
   },
 
+  // ---- Pod-to-pod collisions ------------------------------------------------------
+  // Each pod is two circles (engines in front, cockpit behind), so a hit off the centre
+  // spins it. Impulses use mass (pod.mass) and yaw inertia (pod.yawInertia).
+  bump: {
+    frontOffset: 1.3,        // [live] m, engine circle centre ahead of the pod centre
+    frontRadius: 2.3,        // [live] m
+    rearOffset: -3.0,        // [live] m, cockpit circle centre
+    rearRadius: 1.2,         // [live] m
+    restitution: 0.35,       // [live] bounciness of pod-pod hits (0 = dead, 1 = full bounce)
+    spinScale: 1.0,          // [live] multiplier on the spin from off-centre hits
+    sideHeat: 0.010,         // [live] heat added to the pod hit in the SIDE, per m/s of impact
+    attackerHeat: 0.25,      // [live] fraction of that heat the rammer gets too
+    hitEventMin: 3,          // [live] m/s impact that counts as a hit (shake, haptics)
+  },
+
   // ---- Heat, boost & vent --------------------------------------------------------
   // Heat is 0..1. GREEN below yellowStart. YELLOW from yellowStart to 1.0: more thrust and
   // top speed, but heat rises faster. Reaching 1.0 = OVERHEAT: engines cut for stallTime.
@@ -208,8 +223,10 @@ export const CONFIG = {
 
   // ---- Race / timing -----------------------------------------------------------
   race: {
-    laps: 3,                 // used from step 4. Free practice (unlimited laps) until then.
+    laps: 3,                 // laps per race (2+ players). 0 = endless practice for everyone.
     countdown: 4,            // [live] s of timed-start countdown (READY, 3, 2, 1, GO). 0 = no countdown.
+    practiceWhenSolo: true,  // one player = endless practice laps (no finish / results)
+    finishTimeout: 30,       // [live] s after the winner finishes before results are shown anyway
   },
 
   // ---- Chase camera ----------------------------------------------------------------
@@ -250,6 +267,7 @@ export const CONFIG = {
     // to hold 60 fps). Index = player count, last entry used for higher counts.
     pixelRatioByViewports: [2, 2, 1.5, 1.25, 1.0],
     shadows: true,
+    splitShadows: true,    // shadows in split screen (one shadow pass per viewport). Turn off if 3-4 players drop below 60 fps.
     shadowMapSize: 2048,
   },
 };

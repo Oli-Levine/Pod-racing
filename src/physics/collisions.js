@@ -115,3 +115,75 @@ export function checkReset(pod, g, track, dt) {
     if (pod.stuckT > W.stuckTime) pod.resetReason = 'stuck';
   }
 }
+
+// ============================================================================
+//  Pod-to-pod collisions. Each pod is two circles (engines + cockpit). Contacts
+//  are resolved with a 2D rigid-body impulse using mass and yaw inertia, so a
+//  hit away from the centre spins the pod. The pod hit in the SIDE gains heat
+//  (ramming someone toward overheat is a tactic); the rammer gains a little.
+// ============================================================================
+function circles(pod, out) {
+  const B = CONFIG.bump, fx = Math.sin(pod.yaw), fz = Math.cos(pod.yaw);
+  out[0] = pod.x + fx * B.frontOffset; out[1] = pod.z + fz * B.frontOffset; out[2] = B.frontRadius;
+  out[3] = pod.x + fx * B.rearOffset; out[4] = pod.z + fz * B.rearOffset; out[5] = B.rearRadius;
+  return out;
+}
+
+const ca = new Float64Array(6), cb = new Float64Array(6);
+
+export function collidePods(pods) {
+  for (let i = 0; i < pods.length; i++) for (let j = i + 1; j < pods.length; j++) {
+    const A = pods[i], Bp = pods[j];
+    if (Math.abs(A.y - Bp.y) > 3) continue; // one is flying over the other
+    if (Math.hypot(A.x - Bp.x, A.z - Bp.z) > 12) continue;
+    circles(A, ca); circles(Bp, cb);
+    let best = null;
+    for (let a = 0; a < 6; a += 3) for (let b = 0; b < 6; b += 3) {
+      const dx = ca[a] - cb[b], dz = ca[a + 1] - cb[b + 1], rr = ca[a + 2] + cb[b + 2];
+      const d2 = dx * dx + dz * dz;
+      if (d2 >= rr * rr) continue;
+      const d = Math.sqrt(d2) || 1e-3, pen = rr - d;
+      if (!best || pen > best.pen) {
+        const nx = dx / d, nz = dz / d; // from B to A
+        best = { nx, nz, pen, px: (ca[a] - nx * ca[a + 2] + cb[b] + nx * cb[b + 2]) / 2, pz: (ca[a + 1] - nz * ca[a + 2] + cb[b + 1] + nz * cb[b + 2]) / 2 };
+      }
+    }
+    if (best) resolvePair(A, Bp, best);
+  }
+}
+
+function resolvePair(A, Bp, c) {
+  const P = CONFIG.pod, K = CONFIG.bump;
+  const mA = P.mass, mB = P.mass, IA = P.yawInertia, IB = P.yawInertia;
+  const { nx, nz, pen } = c;
+  // separate (held pods don't move)
+  const wA = A.locked || A.penalty > 0 ? 0 : 1 / mA, wB = Bp.locked || Bp.penalty > 0 ? 0 : 1 / mB;
+  if (wA + wB === 0) return;
+  A.x += nx * pen * wA / (wA + wB); A.z += nz * pen * wA / (wA + wB);
+  Bp.x -= nx * pen * wB / (wA + wB); Bp.z -= nz * pen * wB / (wA + wB);
+
+  // relative velocity at the contact point. Point velocity from yaw rate w: (w*rz, -w*rx)
+  const rAx = c.px - A.x, rAz = c.pz - A.z, rBx = c.px - Bp.x, rBz = c.pz - Bp.z;
+  const vAx = A.vx + A.yawRate * rAz, vAz = A.vz - A.yawRate * rAx;
+  const vBx = Bp.vx + Bp.yawRate * rBz, vBz = Bp.vz - Bp.yawRate * rBx;
+  const vn = (vAx - vBx) * nx + (vAz - vBz) * nz;
+  if (vn >= 0) return; // already separating
+  const kA = rAz * nx - rAx * nz, kB = rBz * nx - rBx * nz; // (r x n) about +Y
+  const iA = wA ? 1 / IA : 0, iB = wB ? 1 / IB : 0;
+  const j = (-(1 + K.restitution) * vn) / (wA + wB + kA * kA * iA + kB * kB * iB);
+  A.vx += j * nx * wA; A.vz += j * nz * wA; A.yawRate += kA * j * iA * K.spinScale;
+  Bp.vx -= j * nx * wB; Bp.vz -= j * nz * wB; Bp.yawRate -= kB * j * iB * K.spinScale;
+
+  // who rammed whom: the pod closing faster on the other is the attacker
+  const vi = -vn;
+  const closeA = -(A.vx * nx + A.vz * nz), closeB = Bp.vx * nx + Bp.vz * nz; // (pre-impulse approx is fine)
+  const sideness = (pod) => Math.abs(nx * -Math.cos(pod.yaw) + nz * Math.sin(pod.yaw)); // |n . right|
+  const [att, vic] = closeA >= closeB ? [A, Bp] : [Bp, A];
+  const heat = K.sideHeat * vi * sideness(vic);
+  vic.heat = Math.min(1, vic.heat + heat);
+  att.heat = Math.min(1, att.heat + heat * K.attackerHeat);
+  if (vi >= K.hitEventMin) {
+    vic.events.push({ type: 'bump', speed: vi, victim: true, heat, other: att.slot, x: c.px, z: c.pz });
+    att.events.push({ type: 'bump', speed: vi, victim: false, heat: heat * K.attackerHeat, other: vic.slot, x: c.px, z: c.pz });
+  }
+}

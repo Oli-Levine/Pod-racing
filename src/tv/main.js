@@ -5,7 +5,7 @@ import { createBackdrop } from '../render/backdrop.js';
 import { InputStore } from './inputStore.js';
 import { createLobbyUI } from './lobbyUI.js';
 import { Game } from '../game/game.js';
-import { gamepad } from '../input/gamepad.js';
+import { gamepads } from '../input/gamepad.js';
 
 const $ = (id) => document.getElementById(id);
 const inputs = new InputStore();
@@ -27,6 +27,7 @@ const conn = new WsClient('tv', {
     if (m.t === 'lobby') onLobby(m);
     else if (m.t === 'inputs') inputs.ingest(m.i);
     else if (m.t === 'startReq') tryStart(false, m.slot);
+    else if (conn.onExtra) conn.onExtra(m);
   },
 });
 
@@ -66,8 +67,8 @@ function showPhase(phase) {
   if (racing) {
     if (!game) game = new Game({ canvas: $('game'), hudRoot: $('hud'), inputs, getLobby: () => snap,
       sendFx: (slot, msg) => conn.send({ t: 'toPlayer', slot, msg }) });
-    // Step 1 is single player: the host's phone (lowest joined slot) drives; the keyboard can always take over.
-    const players = snap.players.filter((p) => p.occupied).map((p) => ({ slot: p.slot, label: `P${p.slot + 1}` }));
+    // Every joined slot gets a pod: phones, and controllers that joined on the TV (local).
+    const players = snap.players.filter((p) => p.occupied).map((p) => ({ slot: p.slot, label: `P${p.slot + 1}`, local: p.local || null }));
     game.start(players);
     window.__game = game; // handy for console debugging
   } else if (game) game.stop();
@@ -80,6 +81,7 @@ function toast(msg) {
 }
 
 function tryStart(force, fromSlot) {
+  if (snap && snap.phase === 'racing' && game && (game.results || game.solo)) { game.restart(); return; } // race again
   if (!snap || snap.phase !== 'lobby') return;
   const present = snap.players.filter((p) => p.occupied && p.connected);
   const waiting = present.filter((p) => !p.ready);
@@ -133,19 +135,35 @@ async function keepAwake() {
 document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') keepAwake(); });
 keepAwake();
 
-// ---- Frame loop --------------------------------------------------------------------------
-// Gamepad buttons outside driving: Menu = start (lobby) / back to grid (race), View = last checkpoint.
+// ---- Controllers -------------------------------------------------------------------------
+// Lobby: A = join as a player, B = leave, Menu = join + start.
+// Race:  Menu = race again (results screen) / restart (solo), View = back to last checkpoint.
+const padJoined = (st) => !!(snap && snap.players.some((p) => p.local === st.key));
 let padToastShown = false;
-gamepad.onButton((b) => {
+gamepads.onButton((b, st) => {
   const racing = snap && snap.phase === 'racing';
-  if (b === 'MENU') { if (!racing) actions.force(); else game && game.restart(); }
-  else if (b === 'VIEW' && racing && game) game.players.forEach((p) => game.resetToCheckpoint(p));
+  if (!racing) {
+    if ((b === 'A' || b === 'MENU') && !padJoined(st)) conn.send({ t: 'localJoin', key: st.key });
+    if (b === 'B' && padJoined(st)) conn.send({ t: 'localLeave', key: st.key });
+    if (b === 'MENU') actions.force();
+  } else if (game) {
+    if (b === 'MENU' && (game.results || game.solo)) game.restart();
+    else if (b === 'VIEW') game.resetByPad(st);
+  }
 });
+conn.onExtra = (m) => { if (m.t === 'localRejected') toast(m.reason === 'full' ? 'Lobby full' : 'Race in progress'); };
 
+// Lobby throttle bars: phones from the relay, controllers read directly.
+const lobbyInput = (i) => {
+  const p = snap && snap.players[i];
+  return p && p.local ? gamepads.byKey(p.local).input() : inputs.get(i);
+};
+
+// ---- Frame loop --------------------------------------------------------------------------
 function frame(now) {
-  gamepad.poll();
-  if (gamepad.connected && !padToastShown) { padToastShown = true; toast('Controller connected - press Menu to start'); }
-  if (!snap || snap.phase === 'lobby') lobbyUI.frame(snap, inputs, now);
+  gamepads.poll();
+  if (gamepads.anyConnected && !padToastShown) { padToastShown = true; toast('Controller connected - press A to join'); }
+  if (!snap || snap.phase === 'lobby') lobbyUI.frame(snap, { get: lobbyInput }, now);
   requestAnimationFrame(frame);
 }
 requestAnimationFrame(frame);

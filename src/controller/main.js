@@ -17,7 +17,7 @@ const S = {
   phase: 'lobby', lobby: null, ready: false, assist: store.get('pod.assist') === '1',
   connected: false, rejected: null, left: false, ping: 0, lastPong: 0,
   seq: 0, ventCount: 0, ventHeld: false,
-  heat: 0, stall: false, boost: false, ventReady: 1, countdown: false, fxAt: 0,
+  heat: 0, stall: false, boost: false, ventReady: 1, countdown: false, fxAt: 0, ended: false,
 };
 
 // ---- Haptics ------------------------------------------------------------------
@@ -79,6 +79,7 @@ function onMsg(m) {
       break;
     case 'fx': // heat state from the TV (~15 Hz): drives the background tint + vent button
       S.heat = m.h / 100; S.stall = !!m.s; S.boost = !!m.b; S.ventReady = m.v / 100; S.countdown = !!m.c; S.fxAt = performance.now();
+      if (!!m.e !== S.ended) { S.ended = !!m.e; render(); } // race over: host gets RACE AGAIN
       return;
     case 'vib': // haptics (Android only; iOS Safari has no vibration API - fails silently)
       haptic(m.k);
@@ -149,13 +150,17 @@ function render() {
   ui.wake.className = wake.status === 'off' || wake.status === 'none' ? 'off' : 'on';
   ui.assist.textContent = `ASSIST: ${S.assist ? 'ON' : 'OFF'}`;
   ui.assist.classList.toggle('on', S.assist);
-  ui.lobbyBtns.style.display = lobby && S.joined ? '' : 'none';
+  const isHost = S.joined && S.lobby && S.lobby.host === S.slot;
+  if (lobby) S.ended = false;
+  ui.lobbyBtns.style.display = (lobby && S.joined) || (S.ended && isHost) ? '' : 'none';
+  ui.ready.style.display = ui.leave.style.display = lobby ? '' : 'none';
+  ui.start.textContent = lobby ? 'START' : 'RACE AGAIN';
   ui.ready.textContent = S.ready ? 'READY ✓' : 'READY';
   ui.ready.classList.toggle('on', S.ready);
   const players = S.lobby ? S.lobby.players.filter((p) => p.occupied && p.connected) : [];
   const allReady = players.length > 0 && players.every((p) => p.ready);
-  ui.start.style.display = S.joined && S.lobby && S.lobby.host === S.slot ? '' : 'none';
-  ui.start.disabled = !allReady;
+  ui.start.style.display = isHost ? '' : 'none';
+  ui.start.disabled = lobby && !allReady;
 
   if (S.rejected && !S.joined) {
     overlay(S.rejected === 'race' ? 'Race in progress' : 'Lobby full',

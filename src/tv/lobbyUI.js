@@ -10,7 +10,7 @@ export function createLobbyUI({ slotsEl, qrCanvas, urlEl, ipNoteEl, maxPlayers }
     const card = document.createElement('div');
     card.className = 'card empty';
     card.innerHTML = `<div class="hd"><b>P${i + 1}</b><span class="st">open</span></div>
-      <div class="meta"><span class="png"></span></div><div class="bars"></div><div class="hint">Scan the QR code to join</div>`;
+      <div class="meta"><span class="png"></span></div><div class="bars"></div><div class="hint">Scan the QR code, or press A on a controller</div>`;
     const bars = createThrottleBars();
     card.querySelector('.bars').appendChild(bars.el);
     slotsEl.appendChild(card);
@@ -28,8 +28,8 @@ export function createLobbyUI({ slotsEl, qrCanvas, urlEl, ipNoteEl, maxPlayers }
         const c = cards[i];
         c.card.style.setProperty('--pc', p.color);
         c.card.className = 'card' + (!p.occupied ? ' empty' : '') + (p.occupied && !p.connected ? ' gone' : '') + (p.ready ? ' ready' : '');
-        c.st.textContent = !p.occupied ? 'open' : !p.connected ? 'reconnecting…' : p.ready ? 'READY' : 'not ready';
-        c.hint.textContent = !p.occupied ? 'Scan the QR code to join' : p.slot === lobby.host ? 'Host: can start from phone' : '';
+        c.st.textContent = !p.occupied ? 'open' : p.local ? 'GAMEPAD - READY' : !p.connected ? 'reconnecting…' : p.ready ? 'READY' : 'not ready';
+        c.hint.textContent = !p.occupied ? 'Scan the QR code, or press A on a controller' : p.local ? 'Press B on the controller to leave' : p.slot === lobby.host ? 'Host: can start from phone' : '';
       });
     },
     // called every frame

@@ -15,6 +15,7 @@ export class Lobby {
     return {
       slot: i, pid: null, ws: null, connected: false, ready: false, ping: 0,
       assist: false, seq: -1, input: null, inputDirty: false, goneAt: 0,
+      local: null, localWs: null, // local player on the TV (e.g. 'pad0'): no phone, input read by the TV
     };
   }
 
@@ -37,6 +38,30 @@ export class Lobby {
     return { slot: s.slot, pid: s.pid, rejoined, old };
   }
 
+  // A controller plugged into the TV joins as its own player (always connected + ready).
+  joinLocal(key, tvWs) {
+    const existing = this.slots.find((x) => x.local === key);
+    if (existing) return { slot: existing.slot };
+    if (this.phase !== PHASE.LOBBY) return { error: 'race' };
+    const s = this.slots.find((x) => !x.pid);
+    if (!s) return { error: 'full' };
+    Object.assign(s, { pid: 'local:' + key, local: key, localWs: tvWs, connected: true, ready: true });
+    return { slot: s.slot };
+  }
+
+  leaveLocal(key) {
+    const s = this.slots.find((x) => x.local === key);
+    if (s && this.phase === PHASE.LOBBY) { this.leave(s.slot); return true; }
+    return false;
+  }
+
+  // TV page closed: drop its local players.
+  dropLocals(tvWs) {
+    let changed = false;
+    for (const s of this.slots) if (s.local && s.localWs === tvWs) { this.leave(s.slot); changed = true; }
+    return changed;
+  }
+
   disconnect(slot) {
     const s = this.slots[slot];
     s.ws = null; s.connected = false; s.goneAt = Date.now();
@@ -50,20 +75,20 @@ export class Lobby {
     if (this.phase !== PHASE.LOBBY) return false;
     let changed = false;
     for (const s of this.slots) {
-      if (s.pid && !s.connected && now - s.goneAt > this.freeAfterMs) { this.leave(s.slot); changed = true; }
+      if (s.pid && !s.local && !s.connected && now - s.goneAt > this.freeAfterMs) { this.leave(s.slot); changed = true; }
     }
     return changed;
   }
 
-  // Player 1 = lowest occupied, connected slot.
+  // Host = lowest occupied slot with a connected phone (local players have no phone).
   hostSlot() {
-    const s = this.slots.find((x) => x.pid && x.connected);
+    const s = this.slots.find((x) => x.pid && x.connected && !x.local);
     return s ? s.slot : -1;
   }
 
   setPhase(phase) {
     this.phase = phase;
-    if (phase === PHASE.LOBBY) for (const s of this.slots) s.ready = false;
+    if (phase === PHASE.LOBBY) for (const s of this.slots) s.ready = !!s.local;
   }
 
   snapshot() {
@@ -71,7 +96,7 @@ export class Lobby {
       t: 'lobby', phase: this.phase, max: this.max, host: this.hostSlot(),
       players: this.slots.map((s) => ({
         slot: s.slot, occupied: !!s.pid, connected: s.connected, ready: s.ready,
-        ping: Math.round(s.ping), assist: s.assist, color: playerColor(s.slot),
+        ping: Math.round(s.ping), assist: s.assist, color: playerColor(s.slot), local: s.local,
       })),
     };
   }

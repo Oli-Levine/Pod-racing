@@ -37,13 +37,14 @@ export class Hud {
         </div>
       </div>
       <div class="h-count"></div>
+      <div class="h-banner"></div>
       <div class="h-pop"></div>
       <div class="h-flash"></div>`;
     root.appendChild(el);
     this.el = el;
     const q = (c) => el.querySelector(c);
     this.n = { lap: q('.h-lap'), pos: q('.h-pos'), time: q('.h-time'), last: q('.h-last'), best: q('.h-best'),
-      speed: q('.h-speed b'), assist: q('.h-assist'), kb: q('.h-kb'), pop: q('.h-pop'), secs: q('.h-secs'), heat: q('.h-heat-fill'), count: q('.h-count'), flash: q('.h-flash'),
+      speed: q('.h-speed b'), assist: q('.h-assist'), kb: q('.h-kb'), pop: q('.h-pop'), secs: q('.h-secs'), heat: q('.h-heat-fill'), count: q('.h-count'), flash: q('.h-flash'), banner: q('.h-banner'),
       win: q('.h-win'), ventfill: q('.h-ventfill'), ventbar: q('.h-ventbar') };
     const H = CONFIG.heat;
     const pos = (el, a, b) => { el.style.left = a * 100 + '%'; el.style.width = (b - a) * 100 + '%'; };
@@ -53,7 +54,11 @@ export class Hud {
     this.popUntil = 0;
   }
 
-  setRect(r) { Object.assign(this.el.style, { left: r.x * 100 + '%', top: r.y * 100 + '%', width: r.w * 100 + '%', height: r.h * 100 + '%' }); }
+  setRect(r) {
+    Object.assign(this.el.style, { left: r.x * 100 + '%', top: r.y * 100 + '%', width: r.w * 100 + '%', height: r.h * 100 + '%' });
+    // HUD sizes are in --u = 1% of this viewport's smaller side, so split-screen HUDs scale down
+    this.el.style.setProperty('--u', Math.min(r.w * innerWidth, r.h * innerHeight) / 100 + 'px');
+  }
 
   popup(text, cls, now, ms = 1600) {
     this.n.pop.textContent = text; this.n.pop.className = 'h-pop show ' + (cls || '');
@@ -82,6 +87,10 @@ export class Hud {
     else if (e.type === 'launch') { this.popup('LAUNCH BOOST!', 'perfect', now, 1500); this.flash('perfect', now); }
     else if (e.type === 'flood') { this.popup('ENGINE FLOODED!', 'bad', now, 2000); this.flash('hot', now); }
     else if (e.type === 'slowstart') { this.popup('SLOW START', 'bad', now, 1000); }
+    else if (e.type === 'bump') {
+      if (e.victim && e.heat > 0.04) this.popup(`RAMMED  +${Math.round(e.heat * 100)} HEAT`, 'bad', now, 900);
+      else if (!e.victim && e.speed > 8) this.popup('HIT!', '', now, 600);
+    }
   }
 
   flash(kind, now) {
@@ -97,12 +106,16 @@ export class Hud {
     this.el.classList.toggle('counting', !!cd.window);
   }
 
-  update(pod, lap, time, pos, total, localDevice, now) {
+  update(pod, lap, time, pos, total, localDevice, now, extra = {}) {
     const n = this.n;
     n.speed.textContent = Math.round(pod.speed * 3.6);
-    n.lap.textContent = lap.lap > 0 ? lap.lap : '-';
+    const lapNo = lap.lap > 0 ? (extra.laps ? Math.min(lap.lap, extra.laps) : lap.lap) : '-';
+    n.lap.textContent = extra.laps ? `${lapNo}/${extra.laps}` : lapNo;
+    const ord = (k) => k + (['th', 'st', 'nd', 'rd'][(k % 100 > 10 && k % 100 < 14) ? 0 : k % 10] || 'th');
+    const banner = extra.finished ? `FINISHED ${ord(pos)}` : extra.disconnected ? 'PHONE DISCONNECTED - REJOIN TO DRIVE' : '';
+    if (n.banner.textContent !== banner) { n.banner.textContent = banner; n.banner.classList.toggle('show', !!banner); }
     n.pos.textContent = `${pos}/${total}`;
-    n.time.textContent = fmt(lap.current(time));
+    n.time.textContent = extra.finished ? fmt(lap.lastLap) : fmt(lap.current(time));
     n.last.textContent = fmt(lap.lastLap);
     n.best.textContent = fmt(lap.bestLap);
     n.assist.style.display = pod.assist ? '' : 'none';

@@ -4,8 +4,8 @@ Couch multiplayer hover-pod racing for 1-4 players (player count is a config val
 The laptop runs the game fullscreen in a browser on the TV; phones are the controllers.
 Everything runs on your home Wi-Fi - no internet or accounts needed once installed.
 
-**Status: Step 3 of 5** - handling, test track, laps, tuning panel, heat / boost / vent / timed start, plus walls,
-pillars and auto reset. Single player. Multiplayer racing (split screen, pod-to-pod hits) and skill extras come next.
+**Status: Step 4 of 5** - handling, test track, laps, tuning panel, heat / boost / vent / timed start, walls and resets,
+plus multiplayer racing for 1-4 players: split screen, pod-to-pod collisions, positions, results. Skill extras come next.
 
 ## How it works
 
@@ -78,20 +78,24 @@ The keyboard takes over the pod whenever you press a driving key, even with a ph
 Connect the controller to the laptop (Bluetooth or USB), open the game, then **press any button once** -
 browsers only reveal a controller after a button press. The TV shows "Controller connected".
 
+**Each controller is its own player:** in the lobby press **A** to take a slot (it is always ready), **B** to leave,
+**Menu** to start. Controllers and phones race together; several controllers work too.
+
 | Control | Action |
 | --- | --- |
 | Left stick up / down | left engine forward / reverse (analog) |
 | Right stick up / down | right engine forward / reverse (analog) |
 | LT / RT | left / right engine forward (alternative to the sticks) |
 | LB / RB | left / right engine reverse |
+| A (lobby) / B (lobby) | join as a player / leave |
 | Y | beginner assist on / off |
-| Menu | start (from the lobby) / back to the start grid (in a race) |
-| View | back to the last checkpoint |
+| Menu | join + start (lobby) / race again (results screen, or any time when racing solo) |
+| View | back to the last checkpoint (2 s penalty when racing others) |
 | A | vent |
 | X | boost (or L3 / R3 for overdrive per side) |
 
-The pad takes over the pod whenever you touch it (priority: gamepad, then keyboard, then phone). It
-rumbles on rough landings. Dead zone and response curve are in `config.js` under `gamepad`.
+A joined controller drives its own pod. When racing solo, a controller that hasn't joined can also take over
+the pod. It rumbles on rough landings, wall hits, bumps, vents and overheats. Dead zone and response curve are in `config.js` under `gamepad`.
 
 ### Tuning panel (`Tab`)
 
@@ -134,6 +138,24 @@ assist, used from step 1), and in the lobby **READY / START / LEAVE**.
 - Engine glow goes cool blue-white, amber, angry red, then sputters. `R` restarts the countdown.
 
 All numbers are in `config.js` under `heat` (and `air.cooling`, `race.countdown`); the tuning panel has a `heat` tab.
+
+## Multiplayer racing
+
+- Every joined player (phone or controller) gets a pod on the grid (4 abreast, staggered rows).
+- **Split screen:** 1 player = full screen, 2 = top / bottom, 3-4 = quad (with 3, the spare quarter shows a live
+  track map with race positions). Render resolution drops with more viewports
+  (`render.pixelRatioByViewports`); `render.splitShadows: false` turns shadows off in split screen if it's slow.
+  The player count comes from `maxPlayers`; more than 4 uses a bigger grid.
+- **Races** are `race.laps` laps (default 3), timed from GO. Positions are live (HUD shows POS and LAP x/3).
+  Finish order, then distance covered for anyone still racing. When everyone has finished - or
+  `race.finishTimeout` (30 s) after the winner - the **results** screen shows positions, race times and best laps.
+  **Enter**, **Menu** on a controller, or **RACE AGAIN** on the host phone restarts; **Esc** goes to the lobby.
+- **Solo** (one player) stays endless practice with lap times (`race.practiceWhenSolo`).
+- **Pod-to-pod hits:** each pod is two circles (engines + cockpit). Hits exchange momentum by mass and relative
+  speed; a hit away from the centre (e.g. on the cockpit) spins the pod. The pod hit in the **side** gains heat
+  (`bump.sideHeat`), the rammer gains a little (`bump.attackerHeat`) - ramming someone toward overheat is a tactic.
+  Shown as "RAMMED +x HEAT" / "HIT!", with shake, phone buzz and rumble. Tuning panel tab: `bump`.
+- A phone that drops mid-race leaves its pod coasting with "PHONE DISCONNECTED"; it rejoins the same pod.
 
 ## Walls, pillars and resets
 

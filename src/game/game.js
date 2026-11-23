@@ -14,10 +14,19 @@ import { Hud } from '../ui/hud.js';
 import { DebugOverlay } from '../ui/debugOverlay.js';
 import { TuningPanel } from '../ui/tuningPanel.js';
 import { KeyboardPod } from '../input/keyboard.js';
-import { gamepad } from '../input/gamepad.js';
+import { gamepads } from '../input/gamepad.js';
+import { collidePods } from '../physics/collisions.js';
+import { Minimap } from '../ui/minimap.js';
+import { Results } from '../ui/results.js';
 import { resetHeat, launch } from '../physics/heat.js';
 
 const lerp = (a, b, t) => a + (b - a) * t;
+
+// Split-screen cell with no player in it (3 players in a 2x2 grid), or null.
+function emptyCell(n) {
+  if (n !== 3) return null;
+  return { x: 0.5, y: 0.5, w: 0.5, h: 0.5 };
+}
 const lerpAngle = (a, b, t) => a + Math.atan2(Math.sin(b - a), Math.cos(b - a)) * t;
 
 // ============================================================================
@@ -47,17 +56,20 @@ export class Game {
     if (CONFIG.debug.overlayOnStart) this.debug.toggle();
     this.players = [];
     this.running = false;
-    this.lastVentCount = new Map();
+    this.minimap = new Minimap(hudRoot, this.track);
+    this.resultsUI = new Results(hudRoot);
     addEventListener('resize', () => this.layout());
     addEventListener('keydown', (e) => this.key(e));
   }
 
-  // players: [{ slot, label }]. slot -1 = keyboard-only pod.
+  // players: [{ slot, label, local }]. slot -1 = keyboard-only pod (nobody joined).
+  // local = 'padN' for a controller that joined on the TV.
   start(players) {
     this.stop();
     const list = players.length ? players : [{ slot: -1, label: 'P1' }];
-    // Step 1: single player. (Split screen + more pods arrive in step 4.)
-    this.players = list.slice(0, 1).map((p, i) => {
+    this.solo = list.length === 1;
+    this.practice = CONFIG.race.laps <= 0 || (this.solo && CONFIG.race.practiceWhenSolo);
+    this.players = list.map((p, i) => {
       const color = playerColor(Math.max(0, p.slot));
       const pod = createPod(p.slot);
       const mesh = createPodMesh(color);
@@ -68,16 +80,23 @@ export class Game {
       this.scene.add(cam.cam);
       const hud = new Hud(this.hudRoot, color, p.label);
       const lap = new LapTimer(this.track);
-      const pl = { ...p, gridIndex: i, color, pod, mesh, cam, streaks, hud, lap, input: { l: 0, r: 0 }, interp: {}, keyboard: false };
+      const pl = { ...p, gridIndex: i, color, pod, mesh, cam, streaks, hud, lap, input: { l: 0, r: 0 }, interp: {}, keyboard: false, pos: i + 1 };
       this.resetToStart(pl);
       return pl;
     });
     this.time = 0; this.acc = 0; this.lastFrame = performance.now(); this.steps = 0;
     this.running = true;
+    this.resetRace();
     this.startCountdown();
     this.canvas.style.display = '';
     this.layout();
     this.raf = requestAnimationFrame((t) => this.frame(t));
+  }
+
+  resetRace() {
+    this.goTime = 0; this.firstFinish = null; this.results = null;
+    this.resultsUI.hide();
+    for (const p of this.players) { p.finished = false; p.finishTime = null; }
   }
 
   stop() {
@@ -85,6 +104,7 @@ export class Game {
     cancelAnimationFrame(this.raf);
     for (const p of this.players) { this.scene.remove(p.mesh.root); this.scene.remove(p.cam.cam); p.hud.dispose(); }
     this.players = [];
+    this.minimap.hide(); this.resultsUI.hide();
     this.canvas.style.display = 'none';
   }
 
@@ -95,11 +115,15 @@ export class Game {
     this.renderer.setPixelRatio(pr);
     this.renderer.setSize(innerWidth, innerHeight, false);
     this.rects = splitLayout(n);
+    this.env.light.castShadow = CONFIG.render.shadows && (n === 1 || CONFIG.render.splitShadows);
     this.players.forEach((p, i) => {
       const r = this.rects[i];
       p.cam.setAspect((r.w * innerWidth) / (r.h * innerHeight));
       p.hud.setRect(r);
     });
+    // an empty split-screen cell (3 players) shows the track map
+    const empty = emptyCell(n);
+    if (empty) this.minimap.show(empty); else this.minimap.hide();
   }
 
   key(e) {
@@ -127,12 +151,13 @@ export class Game {
     placePod(p.pod, pose, CONFIG.hover.rideHeight);
     p.pod.penalty = CONFIG.wall.resetPenalty;
     p.cam.snap();
-    p.hud.event({ type: 'reset', text: reason === 'stuck' ? 'STUCK - RESET' : 'OUT OF BOUNDS' }, performance.now());
+    p.hud.event({ type: 'reset', text: reason === 'stuck' ? 'STUCK - RESET' : reason === 'manual' ? 'RESET' : 'OUT OF BOUNDS' }, performance.now());
   }
 
   // Back to the grid with a fresh timed-start countdown.
   restart() {
     this.players.forEach((p) => this.resetToStart(p));
+    this.resetRace();
     this.startCountdown();
   }
 
@@ -144,7 +169,7 @@ export class Game {
   }
 
   go() {
-    this.cdLeft = 0; this.goUntil = performance.now() + 900;
+    this.cdLeft = 0; this.goUntil = performance.now() + 900; this.goTime = this.time;
     this.players.forEach((p) => launch(p.pod));
   }
 
@@ -167,19 +192,78 @@ export class Game {
     p.hud.event({ type: 'reset', text: spot.name.toUpperCase() }, performance.now());
   }
 
-  // Latest input for a player: phone (via the server relay) or keyboard.
+  // Latest input for a player.
+  //  - a controller that joined on the TV drives its own pod
+  //  - phones drive their pods; the keyboard can take over the first pod (test key overrides)
+  //  - solo: an unjoined controller can also take over
   readInput(p) {
-    let inp;
-    const phone = p.slot >= 0 ? this.inputs.get(p.slot) : null;
-    // priority: gamepad (if in use) > keyboard (if in use) > phone. No phone = local controls only.
-    p.pad = gamepad.active || (p.slot < 0 && gamepad.connected && !this.keyboard.active);
-    p.keyboard = !p.pad && (p.slot < 0 || this.keyboard.active);
-    if (p.pad) inp = gamepad.input();
-    else if (p.keyboard) inp = this.keyboard.input();
-    else inp = { l: phone.l, r: phone.r, od: phone.od, vent: phone.vent, ventCount: phone.ventCount, assist: phone.assist, t: phone.t, seq: phone.seq };
-    const src = p.pad ? 'pad' : p.keyboard ? 'kb' : 'phone';
+    let inp, src;
+    const first = p === this.players[0];
+    if (p.local) {
+      p.padState = gamepads.byKey(p.local); inp = p.padState.input(); src = 'pad';
+    } else {
+      const pad = this.solo ? gamepads.mostRecent() : null;
+      const padFree = pad && !this.players.some((q) => q.local === pad.key);
+      if (padFree && (pad.active || (p.slot < 0 && !this.keyboard.active))) { p.padState = pad; inp = pad.input(); src = 'pad'; }
+      else if (p.slot < 0 || (first && this.keyboard.active)) { inp = this.keyboard.input(); src = 'kb'; }
+      else {
+        const phone = this.inputs.get(p.slot);
+        inp = { l: phone.l, r: phone.r, od: phone.od, vent: phone.vent, ventCount: phone.ventCount, assist: phone.assist, t: phone.t, seq: phone.seq };
+        src = 'phone';
+      }
+    }
+    p.pad = src === 'pad'; p.keyboard = src === 'kb';
     if (src !== p.src) { p.src = src; p.pod.lastVentCount = inp.ventCount; } // each device has its own vent counter
     return inp;
+  }
+
+  // A controller's View button: that player back to the last checkpoint (penalty when racing others).
+  resetByPad(padState) {
+    const p = this.players.find((q) => q.local === padState.key) || (this.solo ? this.players[0] : null);
+    if (!p) return;
+    if (this.solo) this.resetToCheckpoint(p); else this.autoReset(p, 'manual');
+  }
+
+  // Race order: finished pods by finish time, then everyone else by distance covered.
+  standings() {
+    const L = this.track.length;
+    for (const p of this.players) {
+      const rel = (((p.pod.progress - this.track.startS) % L) + L) % L;
+      p.distance = p.lap.lap === 0 ? (rel > L / 2 ? rel - L : rel) : (p.lap.lap - 1) * L + rel;
+    }
+    const order = [...this.players].sort((a, b) => {
+      if (a.finished && b.finished) return a.finishTime - b.finishTime;
+      if (a.finished !== b.finished) return a.finished ? -1 : 1;
+      return b.distance - a.distance;
+    });
+    order.forEach((p, i) => { p.pos = i + 1; });
+    return order;
+  }
+
+  checkFinish(p) {
+    if (this.practice || p.finished || p.lap.laps.length < CONFIG.race.laps) return;
+    p.finished = true;
+    p.finishTime = this.time - this.goTime;
+    if (this.firstFinish === null) this.firstFinish = this.time;
+    const pos = this.players.filter((q) => q.finished).length;
+    p.pod.events.push({ type: 'finish', pos, time: p.finishTime });
+  }
+
+  checkRaceEnd() {
+    if (this.practice || this.results || this.firstFinish === null) return;
+    const lobby = this.getLobby();
+    const racing = this.players.filter((p) => p.slot < 0 || p.local || (lobby && lobby.players[p.slot] && lobby.players[p.slot].connected));
+    const allDone = racing.every((p) => p.finished);
+    if (allDone || this.time - this.firstFinish > CONFIG.race.finishTimeout) this.showResults();
+  }
+
+  showResults() {
+    const order = this.standings();
+    this.results = order.map((p) => ({
+      pos: p.pos, label: p.label, color: p.color, time: p.finished ? p.finishTime : null,
+      best: p.lap.bestLap, laps: p.lap.laps.length, device: p.local ? 'gamepad' : '',
+    }));
+    this.resultsUI.show(this.results, CONFIG.race.laps);
   }
 
   tick(dt) {
@@ -191,10 +275,15 @@ export class Game {
       p.input = this.readInput(p);
       p.pod.prevTime = this.time;
       stepPod(p.pod, p.input, this.track, dt);
+    }
+    if (this.players.length > 1) collidePods(this.players.map((p) => p.pod));
+    for (const p of this.players) {
       p.lap.update(p.pod, this.time + dt, p.pod.events);
+      this.checkFinish(p);
       if (p.pod.resetReason) this.autoReset(p, p.pod.resetReason);
     }
     this.time += dt;
+    this.checkRaceEnd();
   }
 
   frame(now) {
@@ -232,6 +321,8 @@ export class Game {
       this.heatFx(p, s, frameDt, now);
     });
     this.dust.update(frameDt);
+    this.standings();
+    const lobby = this.getLobby();
 
     this.players.forEach((p, i) => {
       const r = this.rects[i];
@@ -245,8 +336,12 @@ export class Game {
       this.renderer.setViewport(x, y, w, h);
       this.renderer.setScissor(x, y, w, h);
       this.renderer.render(this.scene, p.cam.cam);
-      p.hud.update(p.pod, p.lap, this.time, 1, this.players.length, p.pad ? 'GAMEPAD' : p.keyboard ? 'KEYBOARD' : '', now);
+      const lp = lobby && p.slot >= 0 ? lobby.players[p.slot] : null;
+      p.hud.update(p.pod, p.lap, this.time, p.pos, this.players.length, p.pad ? 'GAMEPAD' : p.keyboard ? 'KEYBOARD' : '', now, {
+        laps: this.practice ? 0 : CONFIG.race.laps, finished: p.finished, disconnected: !p.local && lp && !lp.connected && !p.keyboard && !p.pad,
+      });
     });
+    this.minimap.draw(this.players);
 
     this.debug.update({
       hz: CONFIG.physics.hz, steps, pixelRatio: this.pixelRatio, spots: this.track.testSpots,
@@ -264,7 +359,7 @@ export class Game {
     const buzz = (kind) => { if (p.slot >= 0 && !p.pad && !p.keyboard) this.sendFx(p.slot, { t: 'vib', k: kind }); };
     if (e.type === 'land') {
       p.cam.addShake(0.3 + e.loss * 3);
-      if (p.pad && e.loss > 0.03) gamepad.rumble(Math.min(1, 0.3 + e.loss * 2), 200);
+      if (p.pad && e.loss > 0.03) gamepads.rumble(p.padState, Math.min(1, 0.3 + e.loss * 2), 200);
     } else if (e.type === 'vent') {
       const perfect = e.kind === 'perfect', n = perfect ? 34 : e.kind === 'green' ? 4 : 16;
       for (const side of [-1, 1]) for (let i = 0; i < n / 2; i++) {
@@ -275,7 +370,7 @@ export class Game {
       }
       if (e.kind !== 'green') p.cam.addShake(perfect ? 0.5 : 0.2);
       buzz(perfect ? 'perfect' : 'vent');
-      if (p.pad) gamepad.rumble(perfect ? 1 : 0.4, perfect ? 260 : 120);
+      if (p.pad) gamepads.rumble(p.padState, perfect ? 1 : 0.4, perfect ? 260 : 120);
     } else if (e.type === 'overheat' || e.type === 'flood') {
       for (let i = 0; i < 40; i++) {
         const [x, y, z] = this.nozzle(s, i % 2 ? 1 : -1, 1.5);
@@ -283,7 +378,7 @@ export class Game {
       }
       p.cam.addShake(0.9);
       buzz('overheat');
-      if (p.pad) gamepad.rumble(1, 500);
+      if (p.pad) gamepads.rumble(p.padState, 1, 500);
     } else if (e.type === 'wall') {
       const sp = e.speed, rock = e.kind === 'pillar' ? '#b56236' : '#a8572c';
       const sparks = Math.min(36, Math.round(sp * 1.1)), y = s.y - 0.2;
@@ -297,10 +392,17 @@ export class Game {
       }
       p.cam.addShake(Math.min(1.3, sp / 22));
       if (sp > 6) buzz('wall');
-      if (p.pad) gamepad.rumble(Math.min(1, sp / 30), 150);
+      if (p.pad) gamepads.rumble(p.padState, Math.min(1, sp / 30), 150);
+    } else if (e.type === 'bump') {
+      p.cam.addShake(Math.min(1.2, e.speed / 20));
+      if (e.speed > 6) buzz('wall');
+      if (p.pad) gamepads.rumble(p.padState, Math.min(1, e.speed / 25), 160);
+      if (e.victim) for (let i = 0; i < Math.min(20, e.speed); i++) {
+        this.dust.puff(e.x, s.y, e.z, (Math.random() - 0.5) * 10, 1 + Math.random() * 4, (Math.random() - 0.5) * 10, Math.random() < 0.5 ? '#ffd27a' : '#ff9a3a', 0.3, 0.3, 0, 1);
+      }
     } else if (e.type === 'launch') {
       p.cam.addShake(0.6);
-      if (p.pad) gamepad.rumble(0.8, 300);
+      if (p.pad) gamepads.rumble(p.padState, 0.8, 300);
     }
   }
 
@@ -331,7 +433,7 @@ export class Game {
     if (p.slot >= 0 && p.fxT > 1 / 15) {
       p.fxT = 0;
       this.sendFx(p.slot, { t: 'fx', h: Math.round(pod.heat * 100), s: pod.stall > 0 ? 1 : 0, b: pod.boost > 0.5 ? 1 : 0,
-        v: Math.round((1 - pod.ventCd / CONFIG.heat.ventCooldown) * 100), c: this.cdLeft > 0 ? 1 : 0 });
+        v: Math.round((1 - pod.ventCd / CONFIG.heat.ventCooldown) * 100), c: this.cdLeft > 0 ? 1 : 0, e: this.results ? 1 : 0 });
     }
     // countdown / GO banner
     let cd = { text: '' };
@@ -344,7 +446,7 @@ export class Game {
   }
 
   latencyText(p, now) {
-    if (p.pad) return `gamepad (local): ${gamepad.id.slice(0, 40)}`;
+    if (p.pad) return `gamepad (local): ${(p.padState && p.padState.id || '').slice(0, 40)}`;
     if (p.keyboard) return 'keyboard (local)';
     const lobby = this.getLobby();
     const pl = lobby && lobby.players[p.slot];

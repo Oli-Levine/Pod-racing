@@ -86,6 +86,7 @@ wss.on('connection', (ws) => {
 
   ws.on('close', () => {
     tvs.delete(ws); phones.delete(ws);
+    if (ws.role === 'tv' && lobby.dropLocals(ws)) scheduleLobby(true);
     if (ws.slot >= 0 && lobby.slots[ws.slot].ws === ws) {
       lobby.disconnect(ws.slot);
       console.log(`  P${ws.slot + 1} disconnected`);
@@ -130,8 +131,8 @@ function onPhone(ws, m) {
         lobby.leave(ws.slot); ws.slot = -1; scheduleLobby(true);
       }
       break;
-    case 'start':
-      if (ws.slot >= 0 && ws.slot === lobby.hostSlot() && lobby.phase === PHASE.LOBBY) toTVs({ t: 'startReq', slot: ws.slot });
+    case 'start': // host phone: start from the lobby, or "race again" on the results screen (TV decides)
+      if (ws.slot >= 0 && ws.slot === lobby.hostSlot()) toTVs({ t: 'startReq', slot: ws.slot });
       break;
   }
 }
@@ -140,6 +141,15 @@ function onTV(ws, m) {
   switch (m.t) {
     case 'phase':
       if (m.phase === PHASE.LOBBY || m.phase === PHASE.RACING) { lobby.setPhase(m.phase); console.log(`  phase -> ${m.phase}`); scheduleLobby(true); }
+      break;
+    case 'localJoin': {
+      const r = lobby.joinLocal(String(m.key), ws);
+      if (r.error) send(ws, { t: 'localRejected', key: m.key, reason: r.error });
+      else { console.log(`  P${r.slot + 1} joined (local ${m.key})`); scheduleLobby(true); }
+      break;
+    }
+    case 'localLeave':
+      if (lobby.leaveLocal(String(m.key))) scheduleLobby(true);
       break;
     case 'toPlayer': {
       const s = lobby.slots[m.slot];

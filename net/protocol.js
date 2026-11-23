@@ -20,9 +20,10 @@
 // TV -> SERVER
 //   {t:'phase', phase}                 'lobby' | 'racing'
 //   {t:'toPlayer', slot, msg}          relay msg to one phone
+//   {t:'localJoin', key} / {t:'localLeave', key}   a controller on the TV takes / frees a slot
 //
 // SERVER -> TV
-//   {t:'lobby', phase, max, host, players:[{slot,occupied,connected,ready,ping,assist,color}]}
+//   {t:'lobby', phase, max, host, players:[{slot,occupied,connected,ready,ping,assist,color,local}]}
 //   {t:'inputs', i:[[slot,s,l,r,o,v,c,a], ...]}   latest input per player, 60 Hz batches
 //   {t:'startReq', slot}
 
