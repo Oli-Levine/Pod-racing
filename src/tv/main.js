@@ -4,17 +4,16 @@ import { WsClient } from '../net/wsClient.js';
 import { createBackdrop } from '../render/backdrop.js';
 import { InputStore } from './inputStore.js';
 import { createLobbyUI } from './lobbyUI.js';
-import { createThrottleBars } from './throttleBars.js';
-import { splitLayout } from './layout.js';
+import { Game } from '../game/game.js';
 
 const $ = (id) => document.getElementById(id);
 const inputs = new InputStore();
 let snap = null;        // latest lobby snapshot from the server
 let info = null;        // /api/info
 let ipIndex = 0;
-let raceCells = [];
 
-createBackdrop($('bg'));
+const backdrop = createBackdrop($('bg'));
+let game = null; // built on first race start (track build takes a moment)
 const lobbyUI = createLobbyUI({
   slotsEl: $('slots'), qrCanvas: $('qr'), urlEl: $('url'), ipNoteEl: $('ipnote'), maxPlayers: CONFIG.maxPlayers,
 });
@@ -36,7 +35,6 @@ function onLobby(m) {
   inputs.setConnected(m.players.filter((p) => p.occupied && p.connected).map((p) => p.slot));
   lobbyUI.setLobby(m);
   if (m.phase !== wasPhase) showPhase(m.phase);
-  if (m.phase === 'racing') updateRaceCells();
 }
 
 // ---- QR / IP --------------------------------------------------------------------
@@ -58,32 +56,18 @@ function showQR() {
 }
 
 // ---- Phase handling ----------------------------------------------------------------
-// Step 0 'race' is a placeholder: one panel per player with live throttle bars,
-// laid out with the real split-screen layout that step 4 will use.
 function showPhase(phase) {
   const racing = phase === 'racing';
   $('lobby').classList.toggle('hidden', racing);
-  $('race').classList.toggle('hidden', !racing);
+  $('hud').classList.toggle('hidden', !racing);
   $('toLobby').classList.toggle('hidden', !racing);
-}
-
-function updateRaceCells() {
-  const active = snap.players.filter((p) => p.occupied);
-  const rects = splitLayout(Math.max(active.length, 1));
-  const root = $('race');
-  root.innerHTML = ''; raceCells = [];
-  active.forEach((p, i) => {
-    const r = rects[i];
-    const cell = document.createElement('div');
-    cell.className = 'cell';
-    Object.assign(cell.style, { left: r.x * 100 + '%', top: r.y * 100 + '%', width: r.w * 100 + '%', height: r.h * 100 + '%' });
-    cell.style.setProperty('--pc', playerColor(p.slot));
-    cell.innerHTML = `<div class="cin"><h2>P${p.slot + 1}</h2><div class="rs"></div><p>Step 0 placeholder - the track arrives in step 1.<br>Move your thumbs: bars below are your live throttles.</p></div>`;
-    const bars = createThrottleBars();
-    cell.querySelector('.cin').appendChild(bars.el);
-    root.appendChild(cell);
-    raceCells.push({ slot: p.slot, cell, bars, rs: cell.querySelector('.rs') });
-  });
+  backdrop.setPaused(racing);
+  if (racing) {
+    if (!game) game = new Game({ canvas: $('game'), hudRoot: $('hud'), inputs, getLobby: () => snap });
+    // Step 1 is single player: the host's phone (lowest joined slot) drives; the keyboard can always take over.
+    const players = snap.players.filter((p) => p.occupied).map((p) => ({ slot: p.slot, label: `P${p.slot + 1}` }));
+    game.start(players);
+  } else if (game) game.stop();
 }
 
 // ---- Start / keys ---------------------------------------------------------------------
@@ -148,14 +132,7 @@ keepAwake();
 
 // ---- Frame loop --------------------------------------------------------------------------
 function frame(now) {
-  lobbyUI.frame(snap, inputs, now);
-  if (snap && snap.phase === 'racing') {
-    for (const c of raceCells) {
-      const p = snap.players[c.slot];
-      c.bars.update(inputs.get(c.slot), p.connected, now);
-      c.rs.textContent = p.connected ? `ping ${p.ping} ms` : 'phone disconnected - waiting for it to rejoin…';
-    }
-  }
+  if (!snap || snap.phase === 'lobby') lobbyUI.frame(snap, inputs, now);
   requestAnimationFrame(frame);
 }
 requestAnimationFrame(frame);

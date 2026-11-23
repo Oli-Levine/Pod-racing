@@ -38,12 +38,14 @@ export function createBackdrop(canvas) {
   }
   addEventListener('resize', resize); resize();
 
-  let t = 0, last = performance.now();
+  let t = 0, last = performance.now(), paused = false;
   (function loop(now) {
+    requestAnimationFrame(loop);
+    if (paused) { last = now; return; }
     const dt = Math.min((now - last) / 1000, 0.1); last = now; t += dt * 0.05;
     cam.position.set(Math.cos(t) * 24, 5 + Math.sin(t * 1.7) * 1.2, Math.sin(t) * 24);
     cam.lookAt(0, 3, 0);
     renderer.render(scene, cam);
-    requestAnimationFrame(loop);
   })(last);
+  return { setPaused(p) { paused = p; canvas.style.display = p ? 'none' : ''; } };
 }

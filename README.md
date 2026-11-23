@@ -4,8 +4,8 @@ Couch multiplayer hover-pod racing for 1-4 players (player count is a config val
 The laptop runs the game fullscreen in a browser on the TV; phones are the controllers.
 Everything runs on your home Wi-Fi - no internet or accounts needed once installed.
 
-**Status: Step 0 of 5** - scaffold, server, QR code, lobby, phone controller, live throttle bars.
-Handling, track, heat, collisions, multiplayer racing and skill extras come in later steps.
+**Status: Step 1 of 5** - core handling, hover, air control, test track, chase camera, laps and timing,
+debug overlay and live tuning panel. Single player. Heat, collisions, multiplayer racing and skill extras come next.
 
 ## How it works
 
@@ -51,10 +51,33 @@ npm run sim -- 3        # 3 simulated phones join, ready up and wiggle their thr
 | Key | Action |
 | --- | --- |
 | `Enter` | start (when everyone is ready) |
-| `Shift+Enter` | start anyway |
+| `Shift+Enter` | start anyway (no phone needed: you get the keyboard test pod) |
 | `F` | fullscreen |
 | `I` | cycle through detected IP addresses (changes the QR code) |
 | `Esc` | back to lobby |
+
+### Driving / testing keys (during a race)
+
+| Key | Action |
+| --- | --- |
+| `W` / `S` | left engine forward / reverse (keyboard test pod) |
+| `Up` / `Down` | right engine forward / reverse |
+| `B` | toggle beginner assist for the keyboard pod |
+| `R` | reset to the start grid (restarts lap timing) |
+| `T` | reset to the last checkpoint |
+| `` ` `` | debug overlay (speed, slip, yaw rate, engines, surface, hover, input latency) |
+| `1`-`9`, `0` | with the debug overlay open: teleport to a test section (cancels the current lap) |
+| `Tab` | tuning panel (see below) |
+
+The keyboard takes over the pod whenever you press a driving key, even with a phone connected.
+
+### Tuning panel (`Tab`)
+
+Every handling, hover, air, assist, surface, camera and effect value from `config.js`, changed live while
+you drive. `,` `.` switch section, `[` `]` pick a value, `-` `=` change it (hold Shift for big steps,
+Alt for fine), `0` resets it, `C` copies all current values (changed ones listed at the top) so you can
+paste them into `config.js` - or paste them to me. Changes are not saved until they're in `config.js`;
+reloading the page goes back to the file.
 
 Each key also has an on-screen button for touch screens.
 
@@ -69,6 +92,23 @@ All distances live in `config.js` under `controller`.
 
 Top bar: your colour/slot, connection status, ping, wake-lock indicator (☀), **ASSIST** toggle (beginner
 assist, used from step 1), and in the lobby **READY / START / LEAVE**.
+
+## Updating between steps
+
+`git pull`, then stop the server (Ctrl+C) and run `npm start` again (or `npm install && npm start` if
+`package.json` changed). Reload the TV page and the phones. No reboot needed.
+With `npm run dev` most code and `config.js` changes reload the page automatically.
+
+## Handling model (short version)
+
+The pod has mass, a velocity and a heading that are separate. Each engine pushes at its own side, so a
+thrust difference is a torque; rotation has inertia and carries on until you counter-thrust. Grip removes
+sideways velocity up to a limit; past `handling.slideStart` the pod slides, keeps less grip, rotates more
+freely and bleeds speed in proportion to how sideways it is. Thrust efficiency falls off with speed, so top
+speed is where thrust meets drag. Hover is a spring-damper that follows the ground (ramps launch you,
+crests make you light). In the air: no grip, gravity, reduced thrust, differential thrust still rotates you.
+Landing crooked costs speed and wobbles. Assist stabilises rotation and partly corrects slip, but caps how
+fast you can rotate - so raw handling has the higher ceiling.
 
 ## Network notes (read this if phones can't connect)
 
@@ -96,7 +136,14 @@ net/lobby.js           slots, ready, reconnect, host
 net/protocol.js        message reference
 net/ip.js, static.js   LAN address detection, static file server
 src/tv/                TV page: lobby UI, input store, split-screen layout, throttle bars
-src/render/            Three.js (placeholder backdrop for now)
+src/game/game.js       fixed 120 Hz physics loop + interpolated rendering, viewports, resets
+src/physics/           pod.js (state), handling.js (thrust/yaw/grip/assist), hover.js (ride height,
+                       air, landings, body tilt), world.js (one physics step)
+src/track/             testTrack.js (track DATA), track.js (geometry + ground queries), surfaces.js
+src/race/laps.js       checkpoints, laps, sector splits
+src/render/            pod mesh, track mesh, environment, chase camera, dust/streaks, lobby backdrop
+src/ui/                HUD, debug overlay, tuning panel
+src/input/keyboard.js  keyboard test pod
 src/controller/        phone page: throttle pads, wake lock, connection
 src/net/wsClient.js    reconnecting WebSocket client
 scripts/sim-phones.js  fake phones for testing
@@ -105,7 +152,7 @@ scripts/sim-phones.js  fake phones for testing
 ## Roadmap
 
 0. Scaffold, lobby, controller, live throttle bars  (**done**)
-1. Core handling + hover + air control + test track + chase camera + laps + debug overlay + tuning panel
+1. Core handling + hover + air control + test track + chase camera + laps + debug overlay + tuning panel  (**done**)
 2. Heat, boost, vent, perfect vent, timed start
 3. Wall collisions, out-of-bounds reset
 4. Multiplayer racing: split screen, pod-to-pod collisions, positions
