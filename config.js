@@ -112,7 +112,7 @@ export const CONFIG = {
     landingWobble: 1.6,     // [live] yaw-rate kick (rad/s) per radian of misalignment
     hardLandingSpeed: 14,   // [live] m/s downward speed above which a landing costs extra
     hardLandingLoss: 0.012, // [live] fraction of speed lost per m/s above hardLandingSpeed
-    cooling: 1.0,           // (step 2) cooling multiplier in the air
+    cooling: 2.2,           // [live] heat cooling multiplier in the air
   },
 
   // ---- Beginner assist (per player, toggled on the phone / B key) ---------------
@@ -135,9 +135,58 @@ export const CONFIG = {
     salt: { grip: 0.28, drag: 0.0, color: '#efe6da', dust: '#ffffff', label: 'salt flat' },
   },
 
+  // ---- Heat, boost & vent --------------------------------------------------------
+  // Heat is 0..1. GREEN below yellowStart. YELLOW from yellowStart to 1.0: more thrust and
+  // top speed, but heat rises faster. Reaching 1.0 = OVERHEAT: engines cut for stallTime.
+  heat: {
+    yellowStart: 0.5,        // [live] heat where the yellow zone begins
+    // -- gain / cooling (heat units per second) --
+    gainThrust: 0.065,       // [live] heat/s at 100% thrust on both engines (no boost)
+    reverseHeat: 0.5,        // [live] reverse thrust counts this fraction as much as forward
+    yellowGainMult: 1.5,     // [live] heat gain multiplier while in yellow
+    boostHeatMult: 5.0,      // [live] heat gain multiplier while boosting (much faster)
+    coolBase: 0.02,          // [live] passive cooling, always on
+    coolIdle: 0.16,          // [live] extra cooling when off-throttle (fades out by idleThrust)
+    idleThrust: 0.25,        // [live] thrust level below which "off-throttle" cooling kicks in
+    // air cooling multiplier is air.cooling in the air section
+    // -- yellow bonus --
+    yellowThrust: 1.12,      // [live] thrust multiplier in yellow
+    yellowTopSpeed: 1.08,    // [live] top-speed multiplier in yellow (raises the efficiency falloff speed)
+    // -- boost (push BOTH throttles into the overdrive band) --
+    boostThrust: 1.45,       // [live] thrust multiplier while boosting
+    boostTopSpeed: 1.2,      // [live] top-speed multiplier while boosting
+    boostRamp: 0.15,         // [live] s, boost fades in/out over this
+    // -- overheat --
+    stallTime: 2.0,          // [live] s engines are cut after overheating
+    restartHeat: 0.45,       // [live] heat when the engines come back
+    // -- vent (centre button) --
+    ventCooldown: 1.8,       // [live] s before you can vent again (also after a wasted vent)
+    ventKickTime: 0.25,      // [live] s the speed kick is spread over
+    ventGreenDump: 0.04,     // [live] vent in green: almost nothing
+    ventGreenKick: 0.8,      // [live] m/s
+    ventDump: 0.30,          // [live] vent in yellow (outside the perfect band): heat removed
+    ventKick: 4.5,           // [live] m/s speed kick
+    perfectLow: 0.78,        // [live] perfect vent band start (inside yellow, narrow)
+    perfectHigh: 0.90,       // [live] perfect vent band end
+    perfectDump: 0.50,       // [live] heat removed by a perfect vent
+    perfectKick: 12,         // [live] m/s speed kick for a perfect vent
+    // Keyboard / gamepad can't "lift a thumb", so venting there briefly cuts both engines:
+    ventLocalTime: 0.4,      // [live] s
+    ventLocalCut: 0.6,       // [live] fraction of thrust lost during that time
+    // -- timed start (heat during the countdown) --
+    revHeatRate: 0.30,       // [live] heat/s at full throttle while held on the grid
+    startLow: 0.55,          // [live] launch-boost sweet spot (heat at GO)
+    startHigh: 0.72,         // [live]
+    launchKick: 6,           // [live] m/s kick at GO
+    launchThrust: 1.3,       // [live] thrust multiplier for launchTime
+    launchTime: 2.0,         // [live] s
+    // heat >= 1.0 during the countdown floods the engine: stalled stallTime at GO
+  },
+
   // ---- Race / timing -----------------------------------------------------------
   race: {
-    laps: 3,                 // used from step 4. Step 1 is free practice (unlimited laps).
+    laps: 3,                 // used from step 4. Free practice (unlimited laps) until then.
+    countdown: 4,            // [live] s of timed-start countdown (READY, 3, 2, 1, GO). 0 = no countdown.
   },
 
   // ---- Chase camera ----------------------------------------------------------------

@@ -17,7 +17,15 @@ const S = {
   phase: 'lobby', lobby: null, ready: false, assist: store.get('pod.assist') === '1',
   connected: false, rejected: null, left: false, ping: 0, lastPong: 0,
   seq: 0, ventCount: 0, ventHeld: false,
+  heat: 0, stall: false, boost: false, ventReady: 1, countdown: false, fxAt: 0,
 };
+
+// ---- Haptics ------------------------------------------------------------------
+// vent: short tick. perfect: sharp triple. overheat: long double thud. wall: one hit.
+const PATTERNS = { vent: [35], perfect: [25, 45, 25, 45, 70], overheat: [280, 70, 280], wall: [30] };
+function haptic(kind) {
+  try { if (navigator.vibrate && PATTERNS[kind]) navigator.vibrate(PATTERNS[kind]); } catch {}
+}
 
 // ---- Pads + vent ------------------------------------------------------------
 const padL = new ThrottlePad($('padL'), 'L');
@@ -28,6 +36,7 @@ vent.addEventListener('pointerdown', (e) => {
   e.preventDefault(); e.stopPropagation();
   try { vent.setPointerCapture(e.pointerId); } catch {}
   S.ventHeld = true; S.ventCount++; vent.classList.add('down');
+  haptic('vent'); // instant feedback; the TV sends a stronger pattern for a perfect vent
 });
 const ventUp = () => { S.ventHeld = false; vent.classList.remove('down'); };
 vent.addEventListener('pointerup', ventUp);
@@ -68,8 +77,12 @@ function onMsg(m) {
       // Slot was freed under us (e.g. server restarted): fall back to unjoined.
       if (S.joined && !m.players[S.slot]?.occupied) { S.joined = false; S.pid = null; hello(); }
       break;
-    case 'fx':
-      break; // heat tint / haptics arrive here in step 2
+    case 'fx': // heat state from the TV (~15 Hz): drives the background tint + vent button
+      S.heat = m.h / 100; S.stall = !!m.s; S.boost = !!m.b; S.ventReady = m.v / 100; S.countdown = !!m.c; S.fxAt = performance.now();
+      return;
+    case 'vib': // haptics (Android only; iOS Safari has no vibration API - fails silently)
+      haptic(m.k);
+      return;
   }
   render();
 }
@@ -165,9 +178,33 @@ function render() {
 }
 wake.onChange(render);
 
+// ---- Heat tint: the whole background goes green -> yellow -> red so you can read it peripherally ----
+const TINT = { green: [20, 82, 44], yellow: [128, 100, 12], red: [150, 24, 18] };
+const mix = (a, b, t) => a.map((v, i) => v + (b[i] - v) * Math.min(1, Math.max(0, t)));
+let cur = TINT.green.slice(), lastT = performance.now();
+const padsEl = $('pads');
+function tint(now) {
+  const dt = Math.min(0.1, (now - lastT) / 1000); lastT = now;
+  const stale = now - S.fxAt > 1000; // TV not sending state (lobby): neutral green
+  const h = stale ? 0 : S.heat;
+  const Y = 0.5;
+  let target = h < Y - 0.07 ? TINT.green : h < Y ? mix(TINT.green, TINT.yellow, (h - (Y - 0.07)) / 0.07)
+    : h < 0.82 ? TINT.yellow : h < 0.97 ? mix(TINT.yellow, TINT.red, (h - 0.82) / 0.15) : TINT.red;
+  if (!stale && S.stall) target = TINT.red;
+  const pulse = !stale && (S.stall || h > 0.9) ? 0.72 + 0.28 * Math.sin(now / (S.stall ? 40 : 70)) : 1;
+  cur = mix(cur, target, 1 - Math.exp(-12 * dt));
+  const c = cur.map((v) => Math.round(v * pulse)), d = cur.map((v) => Math.round(v * pulse * 0.28));
+  const grad = `radial-gradient(130% 100% at 50% 100%, rgb(${c}), rgb(${d}))`;
+  padsEl.style.background = grad;
+  document.body.style.background = `rgb(${d})`;
+  vent.classList.toggle('cool', !stale && S.ventReady < 1);
+  vent.style.setProperty('--fill', (stale ? 1 : S.ventReady) * 100 + '%');
+}
+
 // ---- Draw loop ------------------------------------------------------------------
 const canvas = $('view');
-function frame() {
+function frame(now) {
+  tint(now);
   drawPads(canvas, [padL, padR], S);
   requestAnimationFrame(frame);
 }

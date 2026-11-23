@@ -10,6 +10,7 @@ export class Dust {
     this.pos = new Float32Array(DUST_MAX * 3); this.vel = new Float32Array(DUST_MAX * 3);
     this.col = new Float32Array(DUST_MAX * 3); this.life = new Float32Array(DUST_MAX); this.max = new Float32Array(DUST_MAX);
     this.size = new Float32Array(DUST_MAX); this.alpha = new Float32Array(DUST_MAX);
+    this.base = new Float32Array(DUST_MAX).fill(1); this.growth = new Float32Array(DUST_MAX).fill(6); this.peak = new Float32Array(DUST_MAX).fill(0.45);
     this.next = 0; this.acc = new Map();
     const geo = new THREE.BufferGeometry();
     geo.setAttribute('position', new THREE.BufferAttribute(this.pos, 3));
@@ -31,6 +32,17 @@ export class Dust {
     this.points.frustumCulled = false;
     scene.add(this.points);
     this.c = new THREE.Color();
+  }
+
+  // one-off particle (smoke / steam / sparks): colour hex, life s, start size, growth, alpha
+  puff(x, y, z, vx, vy, vz, color, life, size = 1, grow = 6, alpha = 0.45) {
+    const i = this.next; this.next = (this.next + 1) % DUST_MAX;
+    const k = i * 3;
+    this.pos[k] = x; this.pos[k + 1] = y; this.pos[k + 2] = z;
+    this.vel[k] = vx; this.vel[k + 1] = vy; this.vel[k + 2] = vz;
+    this.c.set(color);
+    this.col[k] = this.c.r; this.col[k + 1] = this.c.g; this.col[k + 2] = this.c.b;
+    this.max[i] = life; this.life[i] = life; this.base[i] = size; this.growth[i] = grow; this.peak[i] = alpha;
   }
 
   // emit behind a pod (called per render frame)
@@ -58,6 +70,7 @@ export class Dust {
       const sh = 0.85 + Math.random() * 0.2;
       this.col[k] = this.c.r * sh; this.col[k + 1] = this.c.g * sh; this.col[k + 2] = this.c.b * sh;
       this.max[i] = F.dustLife * (0.6 + Math.random() * 0.6); this.life[i] = this.max[i];
+      this.base[i] = 1; this.growth[i] = 6; this.peak[i] = 0.45;
     }
     this.acc.set(pod, a);
   }
@@ -70,8 +83,8 @@ export class Dust {
       const drag = Math.exp(-2.2 * dt);
       this.vel[k] *= drag; this.vel[k + 2] *= drag; this.vel[k + 1] = this.vel[k + 1] * drag + 0.4 * dt;
       this.pos[k] += this.vel[k] * dt; this.pos[k + 1] += this.vel[k + 1] * dt; this.pos[k + 2] += this.vel[k + 2] * dt;
-      this.size[i] = 1 + (1 - f) * 6;
-      this.alpha[i] = f * 0.45;
+      this.size[i] = this.base[i] + (1 - f) * this.growth[i];
+      this.alpha[i] = f * this.peak[i];
     }
     for (const n of ['position', 'color', 'size', 'alpha']) this.geo.attributes[n].needsUpdate = true;
   }

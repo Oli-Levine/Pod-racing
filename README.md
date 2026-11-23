@@ -4,8 +4,8 @@ Couch multiplayer hover-pod racing for 1-4 players (player count is a config val
 The laptop runs the game fullscreen in a browser on the TV; phones are the controllers.
 Everything runs on your home Wi-Fi - no internet or accounts needed once installed.
 
-**Status: Step 1 of 5** - core handling, hover, air control, test track, chase camera, laps and timing,
-debug overlay and live tuning panel. Single player. Heat, collisions, multiplayer racing and skill extras come next.
+**Status: Step 2 of 5** - core handling, test track, laps, tuning panel, plus heat, boost, vent, perfect vent
+and the timed start. Single player. Collisions, multiplayer racing and skill extras come next.
 
 ## How it works
 
@@ -62,8 +62,10 @@ npm run sim -- 3        # 3 simulated phones join, ready up and wiggle their thr
 | --- | --- |
 | `W` / `S` | left engine forward / reverse (keyboard test pod) |
 | `Up` / `Down` | right engine forward / reverse |
+| `Shift` | boost (both engines in overdrive) |
+| `Space` | vent |
 | `B` | toggle beginner assist for the keyboard pod |
-| `R` | reset to the start grid (restarts lap timing) |
+| `R` | back to the start grid with a new timed-start countdown (restarts lap timing) |
 | `T` | reset to the last checkpoint |
 | `` ` `` | debug overlay (speed, slip, yaw rate, engines, surface, hover, input latency) |
 | `1`-`9`, `0` | with the debug overlay open: teleport to a test section (cancels the current lap) |
@@ -85,7 +87,8 @@ browsers only reveal a controller after a button press. The TV shows "Controller
 | Y | beginner assist on / off |
 | Menu | start (from the lobby) / back to the start grid (in a race) |
 | View | back to the last checkpoint |
-| A, X, L3 / R3 | vent, boost, overdrive per side (used from step 2) |
+| A | vent |
+| X | boost (or L3 / R3 for overdrive per side) |
 
 The pad takes over the pod whenever you touch it (priority: gamepad, then keyboard, then phone). It
 rumbles on rough landings. Dead zone and response curve are in `config.js` under `gamepad`.
@@ -106,11 +109,31 @@ Landscape only. Each half of the screen is an **analog throttle** for that engin
 half, then slide your thumb **up** for thrust (full at 90 px, **overdrive** band at 135 px) or **down** for
 reverse (-40% at 55 px). The zero point is where your thumb first lands. If you touch very near the top
 edge the zero point is nudged down so the full range stays reachable (so thrust starts slightly above zero).
-Overdrive on **both** sides = boost (used from step 2). The centre button is **VENT** (step 2).
+Overdrive on **both** sides = boost. The centre button is **VENT**; the whole screen tints green / yellow / red
+with heat, and on Android the phone vibrates for vent, perfect vent and overheat.
 All distances live in `config.js` under `controller`.
 
 Top bar: your colour/slot, connection status, ping, wake-lock indicator (☀), **ASSIST** toggle (beginner
 assist, used from step 1), and in the lobby **READY / START / LEAVE**.
+
+## Heat, boost and vent
+
+- **Heat (0-1)** rises with thrust. **Green** (below 0.5): normal. **Yellow** (0.5-1.0): more thrust and top speed,
+  but heat rises 1.5x faster. **Red** (1.0): **overheat**, engines cut for 2 s, the pod coasts and smokes.
+- **Boost:** push *both* throttles into the overdrive band. Big thrust and top speed, heat 5x faster - only a few seconds.
+- **Cooling** is faster off-throttle and while airborne.
+- **Vent** (centre button) dumps heat and gives a speed kick; cooldown 1.8 s, and it applies even to a wasted vent.
+  In green it does almost nothing. In yellow it dumps 0.30 heat. A **perfect vent** (narrow band inside yellow, shown
+  as a white box on the TV heat gauge) dumps 0.50 and kicks about 3x harder, with a flash. The HUD tells you
+  "early" or "late" when you miss the band.
+  On a phone, pressing vent means lifting a thumb, so you lose that engine for a moment. Keyboard / gamepad can't
+  do that, so a vent there briefly cuts both engines instead (`heat.ventLocalCut` / `ventLocalTime`).
+- **Timed start:** during the countdown (READY, 3, 2, 1, GO) the pod is held on the grid but you can rev. Hold heat
+  inside the **blue band** on the gauge when it says GO for a launch boost. Revving into red floods the engine:
+  you stall for 2 s on the line. Phones and gamepad sticks can hold a partial throttle; on the keyboard, tap the keys.
+- Engine glow goes cool blue-white, amber, angry red, then sputters. `R` restarts the countdown.
+
+All numbers are in `config.js` under `heat` (and `air.cooling`, `race.countdown`); the tuning panel has a `heat` tab.
 
 ## Updating between steps
 

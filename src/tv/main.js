@@ -64,10 +64,12 @@ function showPhase(phase) {
   $('toLobby').classList.toggle('hidden', !racing);
   backdrop.setPaused(racing);
   if (racing) {
-    if (!game) game = new Game({ canvas: $('game'), hudRoot: $('hud'), inputs, getLobby: () => snap });
+    if (!game) game = new Game({ canvas: $('game'), hudRoot: $('hud'), inputs, getLobby: () => snap,
+      sendFx: (slot, msg) => conn.send({ t: 'toPlayer', slot, msg }) });
     // Step 1 is single player: the host's phone (lowest joined slot) drives; the keyboard can always take over.
     const players = snap.players.filter((p) => p.occupied).map((p) => ({ slot: p.slot, label: `P${p.slot + 1}` }));
     game.start(players);
+    window.__game = game; // handy for console debugging
   } else if (game) game.stop();
 }
 
@@ -136,7 +138,7 @@ keepAwake();
 let padToastShown = false;
 gamepad.onButton((b) => {
   const racing = snap && snap.phase === 'racing';
-  if (b === 'MENU') { if (!racing) actions.force(); else game && game.players.forEach((p) => game.resetToStart(p)); }
+  if (b === 'MENU') { if (!racing) actions.force(); else game && game.restart(); }
   else if (b === 'VIEW' && racing && game) game.players.forEach((p) => game.resetToCheckpoint(p));
 });
 

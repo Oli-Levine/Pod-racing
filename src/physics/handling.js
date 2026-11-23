@@ -11,10 +11,10 @@ const DEG = Math.PI / 180;
 
 // Thrust efficiency vs speed along the thrust direction: 1 at rest, 0.5 at
 // thrustFalloffSpeed, tailing off smoothly. Top speed emerges where thrust = drag.
-export function efficiency(speedAlong) {
+export function efficiency(speedAlong, falloffMult = 1) {
   const H = CONFIG.handling;
   if (speedAlong <= 0) return 1;
-  return 1 / (1 + Math.pow(speedAlong / H.thrustFalloffSpeed, H.thrustFalloffSharpness));
+  return 1 / (1 + Math.pow(speedAlong / (H.thrustFalloffSpeed * falloffMult), H.thrustFalloffSharpness));
 }
 
 // Engines spool toward the commanded thrust.
@@ -38,8 +38,9 @@ export function applyHandling(pod, g, dt) {
   // ---- thrust (along the nose) --------------------------------------------
   const thrustScale = A.thrust + (1 - A.thrust) * c;
   const fl = pod.engL * P.thrust, fr = pod.engR * P.thrust;
-  const effL = efficiency(pod.engL >= 0 ? vf : -vf), effR = efficiency(pod.engR >= 0 ? vf : -vf);
-  const aF = ((fl * effL + fr * effR) / P.mass) * thrustScale;
+  const fm = pod.falloffMult;
+  const effL = efficiency(pod.engL >= 0 ? vf : -vf, fm), effR = efficiency(pod.engR >= 0 ? vf : -vf, fm);
+  const aF = ((fl * effL + fr * effR) / P.mass) * thrustScale * pod.thrustMult;
   vf += aF * dt;
   pod.accelF = aF;
 

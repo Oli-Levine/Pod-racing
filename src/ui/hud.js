@@ -1,5 +1,7 @@
 // Per-viewport HUD: speed, heat gauge, lap, position, lap times, sector splits,
 // landing feedback. DOM overlay positioned over the viewport.
+import { CONFIG } from '../../config.js';
+
 export const fmt = (t) => {
   if (t == null) return '--:--.---';
   const m = Math.floor(t / 60), s = t - m * 60;
@@ -23,14 +25,31 @@ export class Hud {
       </div>
       <div class="h-bl">
         <div class="h-speed"><b>0</b><span>km/h</span></div>
-        <div class="h-heat"><div class="h-heat-fill"></div><span>HEAT</span></div>
+        <div class="h-gauge">
+          <div class="h-heat">
+            <div class="h-heat-fill"></div>
+            <div class="h-band h-perfect"></div>
+            <div class="h-band h-win"></div>
+            <div class="h-mark h-yellowmark"></div>
+            <span>HEAT</span>
+          </div>
+          <div class="h-ventbar"><div class="h-ventfill"></div><span>VENT</span></div>
+        </div>
       </div>
-      <div class="h-pop"></div>`;
+      <div class="h-count"></div>
+      <div class="h-pop"></div>
+      <div class="h-flash"></div>`;
     root.appendChild(el);
     this.el = el;
     const q = (c) => el.querySelector(c);
     this.n = { lap: q('.h-lap'), pos: q('.h-pos'), time: q('.h-time'), last: q('.h-last'), best: q('.h-best'),
-      speed: q('.h-speed b'), assist: q('.h-assist'), kb: q('.h-kb'), pop: q('.h-pop'), secs: q('.h-secs'), heat: q('.h-heat-fill') };
+      speed: q('.h-speed b'), assist: q('.h-assist'), kb: q('.h-kb'), pop: q('.h-pop'), secs: q('.h-secs'), heat: q('.h-heat-fill'), count: q('.h-count'), flash: q('.h-flash'),
+      win: q('.h-win'), ventfill: q('.h-ventfill'), ventbar: q('.h-ventbar') };
+    const H = CONFIG.heat;
+    const pos = (el, a, b) => { el.style.left = a * 100 + '%'; el.style.width = (b - a) * 100 + '%'; };
+    pos(q('.h-perfect'), H.perfectLow, H.perfectHigh); pos(this.n.win, H.startLow, H.startHigh);
+    q('.h-yellowmark').style.left = H.yellowStart * 100 + '%';
+    this.flashUntil = 0;
     this.popUntil = 0;
   }
 
@@ -52,7 +71,28 @@ export class Hud {
       else if (e.loss > 0.03) this.popup(`ROUGH LANDING  -${Math.round(e.loss * 100)}%`, 'bad', now, 1100);
     } else if (e.type === 'reset') {
       this.popup(e.text, '', now, 1000);
-    }
+    } else if (e.type === 'vent') {
+      if (e.kind === 'perfect') { this.popup('PERFECT VENT!', 'perfect', now, 1300); this.flash('perfect', now); }
+      else if (e.kind === 'green') this.popup('VENT (too cold)', 'bad', now, 800);
+      else this.popup(e.kind === 'early' ? 'VENT - early' : 'VENT - late', '', now, 800);
+    } else if (e.type === 'overheat') { this.popup('OVERHEAT!', 'bad', now, 2000); this.flash('hot', now); }
+    else if (e.type === 'recover') { this.popup('ENGINES BACK', 'good', now, 700); }
+    else if (e.type === 'launch') { this.popup('LAUNCH BOOST!', 'perfect', now, 1500); this.flash('perfect', now); }
+    else if (e.type === 'flood') { this.popup('ENGINE FLOODED!', 'bad', now, 2000); this.flash('hot', now); }
+    else if (e.type === 'slowstart') { this.popup('SLOW START', 'bad', now, 1000); }
+  }
+
+  flash(kind, now) {
+    this.n.flash.className = 'h-flash ' + kind; void this.n.flash.offsetWidth; this.n.flash.classList.add('go');
+    this.flashUntil = now + 600;
+  }
+
+  // countdown: { text, window } (text '' hides it)
+  setCountdown(cd) {
+    this.n.count.textContent = cd.text || '';
+    this.n.count.classList.toggle('show', !!cd.text);
+    this.n.count.dataset.kind = cd.kind || '';
+    this.el.classList.toggle('counting', !!cd.window);
   }
 
   update(pod, lap, time, pos, total, localDevice, now) {
@@ -66,7 +106,12 @@ export class Hud {
     n.assist.style.display = pod.assist ? '' : 'none';
     n.kb.style.display = localDevice ? '' : 'none';
     if (n.kb.textContent !== localDevice) n.kb.textContent = localDevice;
-    n.heat.style.width = '0%'; // heat arrives in step 2
+    n.heat.style.clipPath = `inset(0 ${(1 - pod.heat) * 100}% 0 0)`;
+    n.ventfill.style.width = (1 - pod.ventCd / CONFIG.heat.ventCooldown) * 100 + '%';
+    n.ventbar.classList.toggle('ready', pod.ventCd <= 0 && pod.stall <= 0);
+    this.el.classList.toggle('stalled', pod.stall > 0);
+    this.el.classList.toggle('boosting', pod.boost > 0.5);
+    this.el.classList.toggle('hot', pod.heat > 0.9 && pod.stall <= 0);
     const secs = lap.bestSectors.map((t, i) => `S${i + 1} ${t.toFixed(2)}`).join('  ');
     if (n.secs.textContent !== secs) n.secs.textContent = secs;
     if (now > this.popUntil) n.pop.classList.remove('show');

@@ -54,7 +54,14 @@ export function drawPads(canvas, pads, S) {
     if (!pad.active) g.fillText(i === 0 ? 'LEFT ENGINE' : 'RIGHT ENGINE', cx, top - 16);
     g.globalAlpha = 1;
   });
-  if (both) {
+  if (S.stall) {
+    g.fillStyle = '#ffd0c8'; g.font = '800 30px system-ui, sans-serif'; g.textAlign = 'center';
+    g.fillText('OVERHEATED', w / 2, h * 0.22);
+  } else if (S.countdown) {
+    g.fillStyle = '#e0f6ff'; g.font = '800 22px system-ui, sans-serif'; g.textAlign = 'center';
+    g.fillText('HOLD REVS - WATCH THE TV GAUGE', w / 2, 34);
+  }
+  if (both && !S.stall) {
     g.fillStyle = '#ff8a2a'; g.font = '800 26px system-ui, sans-serif'; g.textAlign = 'center';
     g.fillText('OVERDRIVE', w / 2, 34);
   }

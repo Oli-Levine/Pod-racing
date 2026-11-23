@@ -2,8 +2,10 @@
 // travel in a different direction to where it faces.
 //   forward = (sin yaw, 0, cos yaw), right = (-cos yaw, 0, sin yaw)
 //   yaw increasing = turning LEFT. yawRate < 0 = turning right.
+import { initHeat } from './heat.js';
+
 export function createPod(slot) {
-  return {
+  const pod = {
     slot,
     x: 0, y: 0, z: 0,          // position (y = height of the pod centre)
     vx: 0, vy: 0, vz: 0,       // velocity
@@ -22,6 +24,8 @@ export function createPod(slot) {
     assist: false,
     ground: {},
   };
+  initHeat(pod);
+  return pod;
 }
 
 export function placePod(pod, pose, rideHeight) {
@@ -29,7 +33,7 @@ export function placePod(pod, pose, rideHeight) {
   pod.y = pod.py = pose.y + rideHeight;
   pod.yaw = pod.pyaw = pose.yaw;
   pod.vx = pod.vy = pod.vz = 0; pod.yawRate = 0; pod.engL = pod.engR = 0;
-  pod.pitch = pod.roll = pod.ppitch = pod.proll = 0; pod.wobble = 0;
+  pod.pitch = pod.roll = pod.ppitch = pod.proll = 0; pod.wobble = 0; pod.kickLeft = 0; pod.boost = 0;
   pod.airborne = false; pod.airTime = 0; pod.contact = 1;
 }
 
