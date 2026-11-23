@@ -9,8 +9,7 @@
     "build": "vite build",
     "start": "vite build && node net/server.js --prod",
     "serve": "node net/server.js --prod",
-    "sim": "node scripts/sim-phones.js",
-    "build:host": "node scripts/build-host.js"
+    "sim": "node scripts/sim-phones.js"
   },
   "engines": {
     "node": ">=18"
