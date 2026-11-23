@@ -71,6 +71,25 @@ npm run sim -- 3        # 3 simulated phones join, ready up and wiggle their thr
 
 The keyboard takes over the pod whenever you press a driving key, even with a phone connected.
 
+### Xbox / gamepad
+
+Connect the controller to the laptop (Bluetooth or USB), open the game, then **press any button once** -
+browsers only reveal a controller after a button press. The TV shows "Controller connected".
+
+| Control | Action |
+| --- | --- |
+| Left stick up / down | left engine forward / reverse (analog) |
+| Right stick up / down | right engine forward / reverse (analog) |
+| LT / RT | left / right engine forward (alternative to the sticks) |
+| LB / RB | left / right engine reverse |
+| Y | beginner assist on / off |
+| Menu | start (from the lobby) / back to the start grid (in a race) |
+| View | back to the last checkpoint |
+| A, X, L3 / R3 | vent, boost, overdrive per side (used from step 2) |
+
+The pad takes over the pod whenever you touch it (priority: gamepad, then keyboard, then phone). It
+rumbles on rough landings. Dead zone and response curve are in `config.js` under `gamepad`.
+
 ### Tuning panel (`Tab`)
 
 Every handling, hover, air, assist, surface, camera and effect value from `config.js`, changed live while

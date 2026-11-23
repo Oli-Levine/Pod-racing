@@ -41,6 +41,16 @@ export const CONFIG = {
   },
 
 
+  // ---- Gamepad (Xbox / any "standard" controller in the TV browser) -----------
+  // Left stick up/down = left engine, right stick up/down = right engine.
+  // Triggers also work: LT/RT = left/right engine forward, LB/RB = that engine in reverse.
+  gamepad: {
+    deadzone: 0.12,        // [live] stick centre dead zone
+    triggerDeadzone: 0.05, // [live]
+    curve: 1.0,            // [live] 1 = linear. >1 = finer control near zero.
+    rumble: true,          // vibrate on rough landings (and later: walls, overheat)
+  },
+
   // ---- Physics core --------------------------------------------------------
   physics: {
     hz: 120,               // fixed physics rate. Handling never depends on frame rate.

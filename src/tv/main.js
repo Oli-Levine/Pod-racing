@@ -5,6 +5,7 @@ import { createBackdrop } from '../render/backdrop.js';
 import { InputStore } from './inputStore.js';
 import { createLobbyUI } from './lobbyUI.js';
 import { Game } from '../game/game.js';
+import { gamepad } from '../input/gamepad.js';
 
 const $ = (id) => document.getElementById(id);
 const inputs = new InputStore();
@@ -131,7 +132,17 @@ document.addEventListener('visibilitychange', () => { if (document.visibilitySta
 keepAwake();
 
 // ---- Frame loop --------------------------------------------------------------------------
+// Gamepad buttons outside driving: Menu = start (lobby) / back to grid (race), View = last checkpoint.
+let padToastShown = false;
+gamepad.onButton((b) => {
+  const racing = snap && snap.phase === 'racing';
+  if (b === 'MENU') { if (!racing) actions.force(); else game && game.players.forEach((p) => game.resetToStart(p)); }
+  else if (b === 'VIEW' && racing && game) game.players.forEach((p) => game.resetToCheckpoint(p));
+});
+
 function frame(now) {
+  gamepad.poll();
+  if (gamepad.connected && !padToastShown) { padToastShown = true; toast('Controller connected - press Menu to start'); }
   if (!snap || snap.phase === 'lobby') lobbyUI.frame(snap, inputs, now);
   requestAnimationFrame(frame);
 }

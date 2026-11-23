@@ -13,7 +13,7 @@ export class Hud {
     el.className = 'hud';
     el.style.setProperty('--pc', color);
     el.innerHTML = `
-      <div class="h-tl"><span class="h-name">${label}</span><span class="h-assist">ASSIST</span><span class="h-kb">KEYBOARD</span></div>
+      <div class="h-tl"><span class="h-name">${label}</span><span class="h-assist">ASSIST</span><span class="h-kb"></span></div>
       <div class="h-tr">
         <div class="h-row"><span class="h-k">LAP</span><b class="h-lap">-</b><span class="h-k">POS</span><b class="h-pos">1/1</b></div>
         <div class="h-time">0:00.000</div>
@@ -55,7 +55,7 @@ export class Hud {
     }
   }
 
-  update(pod, lap, time, pos, total, isKeyboard, now) {
+  update(pod, lap, time, pos, total, localDevice, now) {
     const n = this.n;
     n.speed.textContent = Math.round(pod.speed * 3.6);
     n.lap.textContent = lap.lap > 0 ? lap.lap : '-';
@@ -64,7 +64,8 @@ export class Hud {
     n.last.textContent = fmt(lap.lastLap);
     n.best.textContent = fmt(lap.bestLap);
     n.assist.style.display = pod.assist ? '' : 'none';
-    n.kb.style.display = isKeyboard ? '' : 'none';
+    n.kb.style.display = localDevice ? '' : 'none';
+    if (n.kb.textContent !== localDevice) n.kb.textContent = localDevice;
     n.heat.style.width = '0%'; // heat arrives in step 2
     const secs = lap.bestSectors.map((t, i) => `S${i + 1} ${t.toFixed(2)}`).join('  ');
     if (n.secs.textContent !== secs) n.secs.textContent = secs;

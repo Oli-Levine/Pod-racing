@@ -21,7 +21,7 @@ export class DebugOverlay {
     for (const p of info.pods) {
       const pod = p.pod, inp = p.input, lat = p.latency;
       lines.push('',
-        `${p.label}${pod.assist ? '  [ASSIST]' : ''}${p.keyboard ? '  [KEYBOARD]' : ''}`,
+        `${p.label}${pod.assist ? '  [ASSIST]' : ''}${p.keyboard ? `  [${p.keyboard}]` : ''}`,
         `speed     ${(pod.speed * 3.6).toFixed(0).padStart(4)} km/h  (${pod.speed.toFixed(1)} m/s)`,
         `slip      ${(pod.slip * DEG).toFixed(1).padStart(6)} deg`,
         `yaw rate  ${(pod.yawRate * DEG).toFixed(1).padStart(6)} deg/s`,

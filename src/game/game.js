@@ -14,6 +14,7 @@ import { Hud } from '../ui/hud.js';
 import { DebugOverlay } from '../ui/debugOverlay.js';
 import { TuningPanel } from '../ui/tuningPanel.js';
 import { KeyboardPod } from '../input/keyboard.js';
+import { gamepad } from '../input/gamepad.js';
 
 const lerp = (a, b, t) => a + (b - a) * t;
 const lerpAngle = (a, b, t) => a + Math.atan2(Math.sin(b - a), Math.cos(b - a)) * t;
@@ -51,7 +52,7 @@ export class Game {
   // players: [{ slot, label }]. slot -1 = keyboard-only pod.
   start(players) {
     this.stop();
-    const list = players.length ? players : [{ slot: -1, label: 'KEYBOARD' }];
+    const list = players.length ? players : [{ slot: -1, label: 'P1' }];
     // Step 1: single player. (Split screen + more pods arrive in step 4.)
     this.players = list.slice(0, 1).map((p, i) => {
       const color = playerColor(Math.max(0, p.slot));
@@ -137,8 +138,11 @@ export class Game {
   readInput(p) {
     let inp;
     const phone = p.slot >= 0 ? this.inputs.get(p.slot) : null;
-    p.keyboard = p.slot < 0 || this.keyboard.active;
-    if (p.keyboard) inp = this.keyboard.input();
+    // priority: gamepad (if in use) > keyboard (if in use) > phone. No phone = local controls only.
+    p.pad = gamepad.active || (p.slot < 0 && gamepad.connected && !this.keyboard.active);
+    p.keyboard = !p.pad && (p.slot < 0 || this.keyboard.active);
+    if (p.pad) inp = gamepad.input();
+    else if (p.keyboard) inp = this.keyboard.input();
     else inp = { l: phone.l, r: phone.r, od: phone.od, vent: phone.vent, ventCount: phone.ventCount, assist: phone.assist, t: phone.t, seq: phone.seq };
     return inp;
   }
@@ -184,7 +188,10 @@ export class Game {
       this.dust.emit(p, s, frameDt);
       for (const e of pod.events) {
         p.hud.event(e, now);
-        if (e.type === 'land') p.cam.addShake(0.3 + e.loss * 3);
+        if (e.type === 'land') {
+          p.cam.addShake(0.3 + e.loss * 3);
+          if (p.pad && e.loss > 0.03) gamepad.rumble(Math.min(1, 0.3 + e.loss * 2), 200);
+        }
       }
       pod.events.length = 0;
     });
@@ -202,16 +209,17 @@ export class Game {
       this.renderer.setViewport(x, y, w, h);
       this.renderer.setScissor(x, y, w, h);
       this.renderer.render(this.scene, p.cam.cam);
-      p.hud.update(p.pod, p.lap, this.time, 1, this.players.length, p.keyboard, now);
+      p.hud.update(p.pod, p.lap, this.time, 1, this.players.length, p.pad ? 'GAMEPAD' : p.keyboard ? 'KEYBOARD' : '', now);
     });
 
     this.debug.update({
       hz: CONFIG.physics.hz, steps, pixelRatio: this.pixelRatio, spots: this.track.testSpots,
-      pods: this.players.map((p) => ({ label: p.label, pod: p.pod, input: p.input, keyboard: p.keyboard, lapTimer: p.lap, latency: this.latencyText(p, now) })),
+      pods: this.players.map((p) => ({ label: p.label, pod: p.pod, input: p.input, keyboard: p.pad ? 'GAMEPAD' : p.keyboard ? 'KEYBOARD' : '', lapTimer: p.lap, latency: this.latencyText(p, now) })),
     }, now);
   }
 
   latencyText(p, now) {
+    if (p.pad) return `gamepad (local): ${gamepad.id.slice(0, 40)}`;
     if (p.keyboard) return 'keyboard (local)';
     const lobby = this.getLobby();
     const pl = lobby && lobby.players[p.slot];
