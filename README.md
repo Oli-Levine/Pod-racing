@@ -10,6 +10,7 @@ Handling, track, heat, collisions, multiplayer racing and skill extras come in l
 ## How it works
 
 - `net/server.js` (Node + `ws`) serves the files and relays phone input. It does **no** game logic.
+  `host/pod_host.py` does the same job with plain Python, for hosting on an iPad.
 - Physics and rendering will run in the TV browser page (Three.js, fixed 120 Hz timestep).
 - Phones send input ~60 Hz with a sequence number; the TV uses the latest input per player.
 - A phone stores a player id in `localStorage`, so a dropped phone rejoins the same slot.
@@ -56,6 +57,62 @@ npm run sim -- 3        # 3 simulated phones join, ready up and wiggle their thr
 | `I` | cycle through detected IP addresses (changes the QR code) |
 | `Esc` | back to lobby |
 
+Each key also has an on-screen button for touch screens.
+
+## Hosting on an iPad (no laptop)
+
+An iPad can't run Node.js, so there is a second, no-install host: `host/pod_host.py`. It uses only the
+Python standard library and serves the prebuilt game in `host/www/`. It speaks the same protocol as
+the Node server. The game itself still runs in Safari on the iPad. (`host/www` is rebuilt and
+committed at every step, so you never need to build anything on the iPad.)
+
+**1. Get the files onto the iPad.** In Safari open the GitHub repo -> **Code -> Download ZIP**
+(sign in first if the repo is private). In the **Files** app tap the ZIP to unzip it.
+
+**2. Start the host. Pick one terminal app (both are free on the App Store):**
+
+*a-Shell* (native, fastest). iPadOS pauses apps that leave the screen, so a-Shell must **stay visible**.
+Use Split View (Safari + a-Shell side by side), or, with Stage Manager and an external display, put
+Safari on the TV and leave a-Shell on the iPad screen.
+```
+pickFolder                 # choose the unzipped Pod-racing folder
+cd host
+python3 pod_host.py
+```
+
+*iSH* (emulated Linux, slower). It can keep running in the background, so Safari can go full screen.
+```
+apk add python3
+mount -t ios . /mnt        # choose the unzipped Pod-racing folder
+cd /mnt/host
+cat /dev/location > /dev/null &    # keeps iSH alive in the background (allow location access "Always")
+python3 pod_host.py
+```
+
+If iOS asks to allow **Local Network** access for the app, tap Allow.
+
+**3. Open the game.** In Safari go to **http://localhost:3000/**. For a true full-screen view use
+**Share -> Add to Home Screen** and launch it from the icon. The on-screen buttons (Start, Fullscreen,
+Switch IP, Lobby) replace the keyboard keys.
+
+**4. Settings.** Set **Settings -> Display & Brightness -> Auto-Lock -> Never** while playing. Phones join
+from the QR code as usual.
+
+**TV output from the iPad:** a USB-C or Lightning **HDMI adapter** is best. It mirrors the screen, which
+gives black bars because the iPad isn't 16:9. On iPads with Stage Manager the TV can be a separate,
+full-width display. **Avoid AirPlay** for racing: it adds noticeable display delay.
+
+**Wrong address in the QR code?** Look up the iPad's address in **Settings -> Wi-Fi -> (i)**. Then either
+open `http://localhost:3000/?ip=THAT.ADDRESS` or start the host with `HOST_IP=THAT.ADDRESS python3 pod_host.py`.
+
+**Updating:** download the ZIP again after each step.
+
+**Later steps** add a tuning panel and a keyboard test pod. For those, a Bluetooth or Magic Keyboard on
+the iPad gives you the full set of keys. Touch alternatives will be added where practical.
+
+Developers: after changing code or `config.js`, run `npm run build:host` and commit `host/www`.
+`config.js` network/player values are copied to `host/www/host-config.json`, so both hosts stay in sync.
+
 ## Phone controller
 
 Landscape only. Each half of the screen is an **analog throttle** for that engine: touch anywhere in the
@@ -93,6 +150,7 @@ net/server.js          HTTP + WebSocket relay, lobby/slot bookkeeping
 net/lobby.js           slots, ready, reconnect, host
 net/protocol.js        message reference
 net/ip.js, static.js   LAN address detection, static file server
+host/pod_host.py       no-install Python host (iPad); serves host/www (prebuilt game)
 src/tv/                TV page: lobby UI, input store, split-screen layout, throttle bars
 src/render/            Three.js (placeholder backdrop for now)
 src/controller/        phone page: throttle pads, wake lock, connection

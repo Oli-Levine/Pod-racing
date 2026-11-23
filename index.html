@@ -2,7 +2,10 @@
 <html lang="en">
 <head>
   <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
   <title>Hover Pod Racing</title>
 </head>
 <body>
@@ -19,14 +22,14 @@
       <section id="slots"></section>
     </main>
     <footer>
-      <span><kbd>Enter</kbd> start (when all ready)</span>
-      <span><kbd>Shift+Enter</kbd> start anyway</span>
-      <span><kbd>F</kbd> fullscreen</span>
-      <span><kbd>I</kbd> switch IP</span>
-      <span><kbd>Esc</kbd> back to lobby</span>
+      <button data-act="start"><kbd>Enter</kbd> start (when all ready)</button>
+      <button data-act="force"><kbd>Shift+Enter</kbd> start anyway</button>
+      <button data-act="fs"><kbd>F</kbd> fullscreen</button>
+      <button data-act="ip"><kbd>I</kbd> switch IP</button>
     </footer>
   </div>
   <div id="race" class="hidden"></div>
+  <button id="toLobby" class="hidden" data-act="lobby"><kbd>Esc</kbd> lobby</button>
   <div id="toast"></div>
   <script type="module" src="/src/tv/main.js"></script>
 </body>
