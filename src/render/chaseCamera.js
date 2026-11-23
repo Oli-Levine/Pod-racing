@@ -34,9 +34,16 @@ export class ChaseCamera {
 
     const dist = C.distance + Math.min(s.speed, 80) * 0.015;
     const fx = Math.sin(this.yaw), fz = Math.cos(this.yaw);
-    const x = s.x - fx * dist, z = s.z - fz * dist;
+    let x = s.x - fx * dist, z = s.z - fz * dist;
     let ty = s.y + C.height;
-    const g = track.ground(x, z, this.g);
+    let g = track.ground(x, z, this.g);
+    // keep the camera inside the canyon walls (no clipping into rock on tight corners)
+    const lim = track.runoff - C.wallMargin;
+    if (g.path && g.edge > lim) {
+      const dx = g.cx - x, dz = g.cz - z, len = Math.hypot(dx, dz) || 1, k = Math.min(len, g.edge - lim) / len;
+      x += dx * k; z += dz * k;
+      g = track.ground(x, z, this.g);
+    }
     ty = Math.max(ty, g.h + 0.7);
     this.y += (ty - this.y) * (1 - Math.exp(-C.followStiffness * dt));
     let y = Math.max(this.y, g.h + 0.5);

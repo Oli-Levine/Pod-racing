@@ -136,7 +136,7 @@ export const CONFIG = {
   },
 
   // ---- Walls, pillars, out-of-bounds ------------------------------------------------
-  // Walls sit at the end of the sand run-off (track edge + track.RUNOFF m). A hit is split into
+  // Walls sit at the track edge (+ RUNOFF in the track data, currently 0). A hit is split into
   // the speed INTO the wall (bounces back, adds heat) and the speed ALONG the wall (scrape loss).
   // Tables are indexed by impact angle: 0 deg = parallel scrape, 90 deg = head-on.
   wall: {
@@ -155,7 +155,7 @@ export const CONFIG = {
     stuckDist: 4,            // [live] m: moving less than this from one spot counts as stuck
     stuckTime: 3.0,          // [live] s stuck (trying to move, or touching a wall) before the reset
     resetPenalty: 2.0,       // [live] s frozen after any auto reset (engines cut, cools down)
-    outMargin: 6,            // [live] m beyond the run-off that counts as out of bounds
+    outMargin: 6,            // [live] m beyond the wall line that counts as out of bounds
   },
 
   // ---- Heat, boost & vent --------------------------------------------------------
@@ -229,6 +229,7 @@ export const CONFIG = {
     near: 0.2,
     far: 2500,
     ceilingMargin: 0.8,   // m kept below tunnel ceilings (camera clipping)
+    wallMargin: 0.8,      // m kept inside the canyon walls (camera clipping)
   },
 
   // ---- Effects -----------------------------------------------------------------

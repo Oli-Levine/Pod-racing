@@ -51,7 +51,7 @@ export const CONTROL_POINTS = [
 ];
 
 export const START_LINE = 1.35;    // control point index of the start/finish line
-export const RUNOFF = 10;          // m of sand run-off beyond each track edge (walls start there)
+export const RUNOFF = 0;           // m of sand run-off beyond each track edge before the walls (0 = walls at the edge)
 
 // Risky narrow shortcut: a separate path from CP 27 to CP 30.
 export const SHORTCUT = {

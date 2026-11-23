@@ -137,8 +137,8 @@ All numbers are in `config.js` under `heat` (and `air.cooling`, `race.countdown`
 
 ## Walls, pillars and resets
 
-- **Walls** are the rock faces at the end of the sand run-off (10 m beyond each track edge). **Pillars** in the slalom
-  are solid too. Pods have a collision radius (`wall.radius`, 2 m).
+- **Walls** are the rock faces at the track edge (`RUNOFF` in `src/track/testTrack.js` can add a sand verge).
+  **Pillars** in the slalom are solid too. The camera is kept inside the walls. Pods have a collision radius (`wall.radius`, 2 m).
 - A hit is split into the speed *into* the wall and the speed *along* it, both by **impact angle** (tables in
   `config.js` under `wall`: 0 deg = scrape, 90 deg = head-on):
   - glancing scrape (about 10 deg): loses ~3% of speed, no bounce, almost no heat

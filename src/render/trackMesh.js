@@ -109,7 +109,7 @@ function buildWalls(track, path) {
       const h0 = g.h;
       const k = blocked ? 0.02 : 1;
       const hgt = (8 + rnd() * 10 + Math.sin(s * 0.05) * 4) * k;
-      const prof = [[0, -0.5], [1.5, hgt * 0.45], [4 + rnd() * 2, hgt], [9 + rnd() * 3, hgt * (0.7 + rnd() * 0.3)], [16, null]];
+      const prof = [[0, -0.5], [0.7, hgt * 0.5], [2.5 + rnd() * 2, hgt], [8 + rnd() * 3, hgt * (0.7 + rnd() * 0.3)], [15, null]];
       for (const [off, dy] of prof) {
         const dd = d0 + side * off * (blocked ? 0.1 : 1);
         const x = c.x + -c.tz * dd, z = c.z + c.tx * dd;
