@@ -254,6 +254,7 @@ export class Track {
     out.h = bestPath.heightAt(best.s, best.d, c);
     out.surface = surfaceAt(bestPath.patches, best.s, best.d, c.w / 2);
     out.path = bestPath.id; out.s = best.s; out.d = best.d; out.edge = best.edge;
+    out.cx = c.x; out.cz = c.z; // nearest centre-line point (wall normals point toward it)
     out.onTrack = best.edge <= 0; out.outside = best.edge > this.runoff + 25;
     out.ceiling = Infinity;
     if (bestPath === this.main && this.tunnel && best.s > this.tunnel.from && best.s < this.tunnel.to && best.edge < this.runoff) {

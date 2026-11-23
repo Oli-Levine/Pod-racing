@@ -35,13 +35,14 @@ export function updateHeat(pod, input, dt) {
   pod.lastVentCount = input.ventCount;
   pod.ventCd = Math.max(0, pod.ventCd - dt);
   pod.ventLockT = Math.max(0, pod.ventLockT - dt);
-  if (pressed && pod.ventCd <= 0 && pod.stall <= 0 && !pod.locked) doVent(pod, local);
+  if (pressed && pod.ventCd <= 0 && pod.stall <= 0 && pod.penalty <= 0 && !pod.locked) doVent(pod, local);
 
   // ---- commands ----
   let cl = input.l, cr = input.r;
   if (pod.ventLockT > 0) { const k = 1 - H.ventLocalCut; cl *= k; cr *= k; }
   const stalled = pod.stall > 0;
-  if (stalled) cl = cr = 0;
+  if (stalled || pod.penalty > 0) cl = cr = 0; // overheated, or serving a reset penalty
+  pod.penalty = Math.max(0, pod.penalty - dt);
 
   // ---- boost: both throttles in the overdrive band ----
   const wantBoost = !stalled && !pod.locked && input.od === 3 && cl > 0.9 && cr > 0.9;

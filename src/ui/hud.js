@@ -71,6 +71,8 @@ export class Hud {
       else if (e.loss > 0.03) this.popup(`ROUGH LANDING  -${Math.round(e.loss * 100)}%`, 'bad', now, 1100);
     } else if (e.type === 'reset') {
       this.popup(e.text, '', now, 1000);
+    } else if (e.type === 'wall') {
+      if (e.speed >= CONFIG.wall.heavyHit) this.popup(`HEAVY HIT  -${Math.round(e.lossFrac * 100)}%`, 'bad', now, 1000);
     } else if (e.type === 'vent') {
       if (e.kind === 'perfect') { this.popup('PERFECT VENT!', 'perfect', now, 1300); this.flash('perfect', now); }
       else if (e.kind === 'green') this.popup('VENT (too cold)', 'bad', now, 800);

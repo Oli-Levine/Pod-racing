@@ -135,6 +135,29 @@ export const CONFIG = {
     salt: { grip: 0.28, drag: 0.0, color: '#efe6da', dust: '#ffffff', label: 'salt flat' },
   },
 
+  // ---- Walls, pillars, out-of-bounds ------------------------------------------------
+  // Walls sit at the end of the sand run-off (track edge + track.RUNOFF m). A hit is split into
+  // the speed INTO the wall (bounces back, adds heat) and the speed ALONG the wall (scrape loss).
+  // Tables are indexed by impact angle: 0 deg = parallel scrape, 90 deg = head-on.
+  wall: {
+    radius: 2.0,             // [live] m, pod collision radius (against walls and pillars)
+    angles:       [0,    10,   25,   45,   70,   90],    // impact angle, degrees (table x-axis)
+    tangentLoss:  [0.00, 0.03, 0.10, 0.25, 0.40, 0.55],  // [live] fraction of speed ALONG the wall lost per hit
+    bounce:       [0.00, 0.08, 0.18, 0.30, 0.40, 0.45],  // [live] fraction of the INTO-wall speed bounced back
+    heatPerImpact: 0.0055,   // [live] heat added per m/s of into-wall speed (glancing = little, head-on = lots)
+    spin: 0.10,              // [live] rad/s of yaw kick per m/s into the wall when the nose hits first
+    scrapeDrag: 0.35,        // [live] 1/s extra drag while touching a wall
+    scrapeHeat: 0.0016,      // [live] heat per second per m/s of speed while scraping
+    sparkRate: 70,           // [live] sparks per second at full scrape
+    hitEventMin: 3,          // [live] m/s into-wall speed that counts as a hit (shake, haptic, popup)
+    heavyHit: 18,            // [live] m/s into-wall speed shown as a HEAVY HIT
+    // -- stuck / out of bounds -> auto reset to the last checkpoint --
+    stuckDist: 4,            // [live] m: moving less than this from one spot counts as stuck
+    stuckTime: 3.0,          // [live] s stuck (trying to move, or touching a wall) before the reset
+    resetPenalty: 2.0,       // [live] s frozen after any auto reset (engines cut, cools down)
+    outMargin: 6,            // [live] m beyond the run-off that counts as out of bounds
+  },
+
   // ---- Heat, boost & vent --------------------------------------------------------
   // Heat is 0..1. GREEN below yellowStart. YELLOW from yellowStart to 1.0: more thrust and
   // top speed, but heat rises faster. Reaching 1.0 = OVERHEAT: engines cut for stallTime.

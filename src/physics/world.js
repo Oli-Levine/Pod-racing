@@ -2,6 +2,7 @@ import { CONFIG } from '../../config.js';
 import { savePrev } from './pod.js';
 import { updateEngines, applyHandling } from './handling.js';
 import { updateHeat, applyKick } from './heat.js';
+import { collide, checkReset } from './collisions.js';
 import { applyHover, resolveVertical, updateVisualTilt } from './hover.js';
 
 // One fixed physics step for one pod.
@@ -15,10 +16,13 @@ export function stepPod(pod, input, track, dt) {
   applyHover(pod, g, dt);
   applyHandling(pod, g, dt);
   applyKick(pod, dt);
-  if (pod.locked) { pod.vx = pod.vz = 0; pod.yawRate = 0; pod.speed = 0; } // held on the grid during the countdown
+  if (pod.locked || pod.penalty > 0) { pod.vx = pod.vz = 0; pod.yawRate = 0; pod.speed = 0; } // held on the grid / serving a penalty
   pod.x += pod.vx * dt; pod.y += pod.vy * dt; pod.z += pod.vz * dt;
   const g2 = track.ground(pod.x, pod.z, pod.ground2 || (pod.ground2 = {}));
   g2.gx = g.gx; g2.gz = g.gz;
+  collide(pod, g2, track, dt);
+  pod.speed = Math.hypot(pod.vx, pod.vz);
+  checkReset(pod, g2, track, dt);
   resolveVertical(pod, g2, dt);
   updateVisualTilt(pod, g, dt);
   pod.onTrack = g2.onTrack;

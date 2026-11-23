@@ -11,7 +11,7 @@ import { CONFIG } from '../../config.js';
 //  Changes are NOT saved: reload the page to go back to config.js.
 // ============================================================================
 
-const SECTIONS = ['handling', 'heat', 'pod', 'hover', 'air', 'assist', 'surfaces', 'physics', 'camera', 'fx', 'race'];
+const SECTIONS = ['handling', 'heat', 'wall', 'pod', 'hover', 'air', 'assist', 'surfaces', 'physics', 'camera', 'fx', 'race'];
 const SKIP = new Set(['hz', 'maxStepsPerFrame', 'near', 'far', 'laps']);
 
 function collect() {
@@ -22,7 +22,10 @@ function collect() {
     const o = CONFIG[sec];
     if (sec === 'surfaces') {
       for (const [name, s] of Object.entries(o)) for (const k of Object.keys(s)) add(s, k, `${name}.${k}`);
-    } else for (const k of Object.keys(o)) add(o, k, k);
+    } else for (const k of Object.keys(o)) {
+      if (Array.isArray(o[k])) o[k].forEach((_, i) => add(o[k], i, `${k}[${sec === 'wall' && o.angles && k !== 'angles' ? o.angles[i] + 'deg' : i}]`));
+      else add(o, k, k);
+    }
     out.push({ name: sec, items });
   }
   return out;

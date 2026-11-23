@@ -4,8 +4,8 @@ Couch multiplayer hover-pod racing for 1-4 players (player count is a config val
 The laptop runs the game fullscreen in a browser on the TV; phones are the controllers.
 Everything runs on your home Wi-Fi - no internet or accounts needed once installed.
 
-**Status: Step 2 of 5** - core handling, test track, laps, tuning panel, plus heat, boost, vent, perfect vent
-and the timed start. Single player. Collisions, multiplayer racing and skill extras come next.
+**Status: Step 3 of 5** - handling, test track, laps, tuning panel, heat / boost / vent / timed start, plus walls,
+pillars and auto reset. Single player. Multiplayer racing (split screen, pod-to-pod hits) and skill extras come next.
 
 ## How it works
 
@@ -134,6 +134,26 @@ assist, used from step 1), and in the lobby **READY / START / LEAVE**.
 - Engine glow goes cool blue-white, amber, angry red, then sputters. `R` restarts the countdown.
 
 All numbers are in `config.js` under `heat` (and `air.cooling`, `race.countdown`); the tuning panel has a `heat` tab.
+
+## Walls, pillars and resets
+
+- **Walls** are the rock faces at the end of the sand run-off (10 m beyond each track edge). **Pillars** in the slalom
+  are solid too. Pods have a collision radius (`wall.radius`, 2 m).
+- A hit is split into the speed *into* the wall and the speed *along* it, both by **impact angle** (tables in
+  `config.js` under `wall`: 0 deg = scrape, 90 deg = head-on):
+  - glancing scrape (about 10 deg): loses ~3% of speed, no bounce, almost no heat
+  - 45 deg: loses ~25% along the wall and bounces ~30% of the into-wall speed
+  - head-on: loses ~55%, bounces back, and adds the most heat (`wall.heatPerImpact`)
+  - nose-first hits spin the nose away from the wall
+- **Scraping** along a wall adds drag, heat (`wall.scrapeHeat`) and throws sparks. A hard enough hit can push you
+  into overheat. Heavy hits show "HEAVY HIT -x%".
+- **Auto reset** to the last checkpoint (facing along the track, centre line) with a frozen **2 s penalty**
+  (engines cut, the pod cools) when you:
+  - leave the world / go well beyond the run-off ("OUT OF BOUNDS"), or
+  - are **stuck**: trying to move (throttle or pushed against a wall) but staying within 4 m of the same spot for 3 s.
+    Standing still with no throttle, spinning on the spot, stalls and the countdown do not count.
+- The `T` key still resets to the last checkpoint without a penalty (test key).
+- Phones buzz on wall hits (Android), the gamepad rumbles, the camera shakes. The tuning panel has a `wall` tab.
 
 ## Updating between steps
 

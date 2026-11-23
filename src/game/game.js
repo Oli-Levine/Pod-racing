@@ -120,6 +120,16 @@ export class Game {
     p.cam.snap();
   }
 
+  // Out of bounds / stuck: back to the last checkpoint, facing along the track, with a short frozen penalty.
+  autoReset(p, reason) {
+    const gates = this.track.checkpoints;
+    const pose = p.lap.lastCp < 0 ? this.track.gridSlot(p.gridIndex) : this.track.gatePose(gates[p.lap.lastCp]);
+    placePod(p.pod, pose, CONFIG.hover.rideHeight);
+    p.pod.penalty = CONFIG.wall.resetPenalty;
+    p.cam.snap();
+    p.hud.event({ type: 'reset', text: reason === 'stuck' ? 'STUCK - RESET' : 'OUT OF BOUNDS' }, performance.now());
+  }
+
   // Back to the grid with a fresh timed-start countdown.
   restart() {
     this.players.forEach((p) => this.resetToStart(p));
@@ -182,8 +192,7 @@ export class Game {
       p.pod.prevTime = this.time;
       stepPod(p.pod, p.input, this.track, dt);
       p.lap.update(p.pod, this.time + dt, p.pod.events);
-      // safety net until step 3's proper out-of-bounds reset
-      if (p.pod.y < -40 || p.pod.outside) this.resetToCheckpoint(p);
+      if (p.pod.resetReason) this.autoReset(p, p.pod.resetReason);
     }
     this.time += dt;
   }
@@ -275,6 +284,20 @@ export class Game {
       p.cam.addShake(0.9);
       buzz('overheat');
       if (p.pad) gamepad.rumble(1, 500);
+    } else if (e.type === 'wall') {
+      const sp = e.speed, rock = e.kind === 'pillar' ? '#b56236' : '#a8572c';
+      const sparks = Math.min(36, Math.round(sp * 1.1)), y = s.y - 0.2;
+      for (let i = 0; i < sparks; i++) {
+        const a = Math.random() * 6.28, v = 4 + Math.random() * sp * 0.5;
+        this.dust.puff(e.x, y, e.z, e.nx * v * 0.6 + Math.cos(a) * v * 0.5 + s.vx * 0.3, 1 + Math.random() * 4, e.nz * v * 0.6 + Math.sin(a) * v * 0.5 + s.vz * 0.3,
+          Math.random() < 0.5 ? '#ffd27a' : '#ff9a3a', 0.25 + Math.random() * 0.3, 0.3, 0, 1);
+      }
+      for (let i = 0; i < Math.min(14, sp * 0.4); i++) {
+        this.dust.puff(e.x, y, e.z, e.nx * 3 + (Math.random() - 0.5) * 5, 1 + Math.random() * 3, e.nz * 3 + (Math.random() - 0.5) * 5, rock, 0.8 + Math.random() * 0.6, 1.2, 6, 0.5);
+      }
+      p.cam.addShake(Math.min(1.3, sp / 22));
+      if (sp > 6) buzz('wall');
+      if (p.pad) gamepad.rumble(Math.min(1, sp / 30), 150);
     } else if (e.type === 'launch') {
       p.cam.addShake(0.6);
       if (p.pad) gamepad.rumble(0.8, 300);
@@ -292,6 +315,17 @@ export class Game {
       this.dust.puff(x, y + 0.2, z, s.vx * 0.4 + (Math.random() - 0.5) * 2, 1.5 + Math.random() * 2, s.vz * 0.4 + (Math.random() - 0.5) * 2,
         pod.stall > 0 ? '#2b2623' : '#6b625b', 1.0 + Math.random() * 0.8, 1, 5, pod.stall > 0 ? 0.55 : 0.35);
     }
+    // continuous sparks while scraping a wall
+    if (pod.scrape > 0.05) {
+      p.sparkAcc = (p.sparkAcc || 0) + CONFIG.wall.sparkRate * pod.scrape * dt;
+      const R = CONFIG.wall.radius;
+      while (p.sparkAcc >= 1) {
+        p.sparkAcc -= 1;
+        const along = Math.random() * 6 - 3;
+        this.dust.puff(s.x - pod.wallNx * R, s.y - 0.2 + Math.random() * 0.5, s.z - pod.wallNz * R, s.vx * 0.5 + pod.wallNx * (1 + Math.random() * 3), 1 + Math.random() * 3, s.vz * 0.5 + pod.wallNz * (1 + Math.random() * 3),
+          Math.random() < 0.5 ? '#ffd27a' : '#ff9a3a', 0.2 + Math.random() * 0.25, 0.3, 0, 1);
+      }
+    }
     // phone state at ~15 Hz (background tint, vent button)
     p.fxT = (p.fxT || 0) + dt;
     if (p.slot >= 0 && p.fxT > 1 / 15) {
@@ -301,7 +335,8 @@ export class Game {
     }
     // countdown / GO banner
     let cd = { text: '' };
-    if (this.cdLeft > 0) {
+    if (pod.penalty > 0) cd = { text: `RESET ${pod.penalty.toFixed(1)}`, kind: 'ready' };
+    else if (this.cdLeft > 0) {
       const t = this.cdLeft;
       cd = t > 3 ? { text: 'READY', kind: 'ready', window: true } : { text: String(Math.ceil(t)), window: true };
     } else if (now < this.goUntil) cd = { text: 'GO!', kind: 'go' };
