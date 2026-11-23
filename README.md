@@ -4,8 +4,9 @@ Couch multiplayer hover-pod racing for 1-4 players (player count is a config val
 The laptop runs the game fullscreen in a browser on the TV; phones are the controllers.
 Everything runs on your home Wi-Fi - no internet or accounts needed once installed.
 
-**Status: Step 4 of 5** - handling, test track, laps, tuning panel, heat / boost / vent / timed start, walls and resets,
-plus multiplayer racing for 1-4 players: split screen, pod-to-pod collisions, positions, results. Skill extras come next.
+**Status: all 5 steps built** - handling, test track, laps, tuning panel, heat / boost / vent / timed start, walls and resets,
+multiplayer racing for 1-4 players (split screen, pod-to-pod collisions, positions, results), and the skill extras
+(slide-charge, slipstream).
 
 ## How it works
 
@@ -157,6 +158,21 @@ All numbers are in `config.js` under `heat` (and `air.cooling`, `race.countdown`
   Shown as "RAMMED +x HEAT" / "HIT!", with shake, phone buzz and rumble. Tuning panel tab: `bump`.
 - A phone that drops mid-race leaves its pod coasting with "PHONE DISCONNECTED"; it rejoins the same pod.
 
+## Skill extras
+
+- **Slide-charge:** keep a slip angle inside the **9-27 degree band** (`slide.bandLow` / `bandHigh`) at 25+ m/s with
+  **both engines thrusting** (at least 50%) and a charge builds (about 0.8 s to full). The **SLIDE bar** on the HUD fills;
+  it glows while you're in the band. **Straighten out** (slip below 5 degrees) and it pays out as a speed kick, up to
+  +14 m/s at full charge ("SLIDE BOOST +x%"). Charging costs a little heat. Slip past the band
+  (over-rotated) and the charge **drains fast** ("OVER-ROTATED"): a sloppy slide gives nothing. Lifting off the
+  throttle or leaving the ground fades it. Salt and sand patches make slides easier to start; assist stops most slides,
+  so it can't earn much.
+- **Slipstream:** follow within 40 m of another pod, near its line, and your **drag drops (up to 70%)** and you
+  **cool a little** (`slipstream.*`). It builds over 0.7 s and fades over 1 s. You'll see a **SLIPSTREAM** tag, a wider
+  field of view, extra speed lines, and a hazy **wake** behind the pod in front. Nothing changes for the leader and
+  nobody is rubber-banded: it's natural catch-up, and the slingshot passes work because drag stays low as you pull out.
+- Tuning panel tabs: `slide` and `slipstream`. Debug overlay (`` ` ``) shows slide state, charge and slipstream strength.
+
 ## Walls, pillars and resets
 
 - **Walls** are the rock faces at the track edge (`RUNOFF` in `src/track/testTrack.js` can add a sand verge).
@@ -237,7 +253,7 @@ scripts/sim-phones.js  fake phones for testing
 
 0. Scaffold, lobby, controller, live throttle bars  (**done**)
 1. Core handling + hover + air control + test track + chase camera + laps + debug overlay + tuning panel  (**done**)
-2. Heat, boost, vent, perfect vent, timed start
-3. Wall collisions, out-of-bounds reset
-4. Multiplayer racing: split screen, pod-to-pod collisions, positions
-5. Skill extras: slide-charge, slipstream
+2. Heat, boost, vent, perfect vent, timed start  (**done**)
+3. Wall collisions, out-of-bounds reset  (**done**)
+4. Multiplayer racing: split screen, pod-to-pod collisions, positions  (**done**)
+5. Skill extras: slide-charge, slipstream  (**done**)

@@ -80,7 +80,7 @@ export function applyHandling(pod, g, dt) {
   // ---- speed loss: slip, drag -----------------------------------------------------
   const speed = Math.hypot(vf, vl);
   const sinSlip = speed > 0.5 ? Math.abs(vl) / speed : 0;
-  const loss = H.slipSpeedLoss * sinSlip * c + H.dragLinear + surf.drag * c + H.dragAero * speed;
+  const loss = H.slipSpeedLoss * sinSlip * c + (H.dragLinear + H.dragAero * speed) * pod.dragMult + surf.drag * c;
   const keep = Math.exp(-loss * dt);
   vf *= keep; vl *= keep;
 

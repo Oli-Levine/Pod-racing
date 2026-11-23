@@ -112,15 +112,15 @@ export class SpeedStreaks {
   }
 
   // attach to camera (camera space: -Z forward)
-  update(speed, dt) {
+  update(speed, dt, slip = 0) {
     const F = CONFIG.fx;
-    const k = Math.max(0, Math.min(1, (speed - F.streakStart) / 30));
-    this.mat.opacity = k * 0.35;
+    const k = Math.max(0, Math.min(1, (speed - F.streakStart) / 30 + slip * 0.6));
+    this.mat.opacity = k * (0.35 + slip * 0.4);
     this.lines.visible = k > 0;
     if (!k) return;
-    const len = 1 + speed * 0.05;
+    const len = 1 + speed * 0.05 * (1 + slip);
     this.pts.forEach((p, i) => {
-      p.z += speed * 1.4 * dt;
+      p.z += speed * (1.4 + slip * 0.5) * dt;
       if (p.z > 2) this.spawn(p, false);
       const o = i * 6;
       this.pos[o] = p.x; this.pos[o + 1] = p.y; this.pos[o + 2] = p.z;

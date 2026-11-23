@@ -62,7 +62,7 @@ export function updateHeat(pod, input, dt) {
     const gain = rate * lvl * (1 + (H.boostHeatMult - 1) * pod.boost) * (yellow ? H.yellowGainMult : 1);
     const idle = clamp(1 - lvl / Math.max(1e-3, H.idleThrust), 0, 1);
     const air = pod.airborne ? CONFIG.air.cooling : 1;
-    const cool = (H.coolBase + H.coolIdle * idle) * air;
+    const cool = (H.coolBase + H.coolIdle * idle) * air + pod.slipCool;
     pod.heat = clamp(pod.heat + (gain - cool) * dt, 0, 1);
     if (pod.heat >= 1) {
       if (pod.locked) { pod.flooded = true; }

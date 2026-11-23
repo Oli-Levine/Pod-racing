@@ -133,3 +133,10 @@ kbd { background: #fff2; border-radius: .5vmin; padding: .1vmin .8vmin; font: in
 .results i { font-style: normal; font-size: 1.8vmin; opacity: .7; } .results .r-best { font-size: 2.2vmin; opacity: .8; } .results .fast { color: #c26bff; opacity: 1; }
 .results tr:first-child .r-pos { color: #f2c94c; }
 .results p { font-size: 1.9vmin; opacity: .8; margin: 2.4vmin 0 0; }
+
+.h-slipflag { font-size: calc(var(--u) * 1.5); padding: calc(var(--u) * .2) calc(var(--u) * .8); border-radius: calc(var(--u) * .5); background: #8fd8ff; color: #08202f; text-shadow: none; display: none; }
+.h-chargebar { position: relative; height: calc(var(--u) * 1.1); margin-top: calc(var(--u) * .5); background: #0007; border: calc(var(--u) * .15) solid #fff4; border-radius: calc(var(--u) * .6); overflow: hidden; }
+.h-chargefill { position: absolute; inset: 0 auto 0 0; background: #ffb347; opacity: .75; }
+.h-chargebar[data-state="charging"] .h-chargefill { background: #fff0c8; opacity: 1; box-shadow: 0 0 calc(var(--u) * 1.5) #ffb347; }
+.h-chargebar[data-state="over"] .h-chargefill { background: #ff4a2e; opacity: 1; }
+.h-chargebar span { position: absolute; left: calc(var(--u) * .8); top: 50%; transform: translateY(-50%); font-size: calc(var(--u) * .9); letter-spacing: .15em; color: #fff; }

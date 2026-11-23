@@ -173,6 +173,40 @@ export const CONFIG = {
     hitEventMin: 3,          // [live] m/s impact that counts as a hit (shake, haptics)
   },
 
+  // ---- Slide-charge (skill extra) ----------------------------------------------------
+  // Hold a slip angle inside [bandLow, bandHigh] with BOTH engines thrusting: a charge builds.
+  // Straighten out (slip below releaseSlip) and it pays out as a speed kick. Slipping too far
+  // (over-rotated) drains the charge instead: a sloppy slide gives nothing.
+  slide: {
+    bandLow: 9,            // [live] deg of slip where charging starts
+    bandHigh: 27,          // [live] deg where it counts as over-rotated
+    minSpeed: 25,          // [live] m/s needed to charge
+    minThrust: 0.5,        // [live] both engines must be at least this high
+    chargeRate: 1.3,       // [live] charge per second inside the band (full charge = 1.0)
+    overDrain: 2.5,        // [live] charge lost per second while over-rotated
+    decay: 1.0,            // [live] charge lost per second while not sliding / lifting off
+    releaseSlip: 5,        // [live] deg: straighten below this to cash in
+    minCharge: 0.15,       // [live] below this the release pays nothing
+    payoutKick: 14,        // [live] m/s speed kick at full charge (scales with charge)
+    payoutTime: 0.3,       // [live] s the kick is spread over
+    heatRate: 0.04,        // [live] heat per second while charging (charging costs a little heat)
+  },
+
+  // ---- Slipstream (skill extra) -------------------------------------------------------
+  // Following close behind another pod lowers your drag and cools you slightly. Natural
+  // catch-up: nothing changes for the leader and nobody gets rubber-banding.
+  slipstream: {
+    range: 40,             // [live] m behind a pod where its wake helps you
+    minRange: 3,           // [live] m: closer than this (touching) gives nothing extra
+    width: 6.5,            // [live] m either side of the leader's line
+    minSpeed: 22,          // [live] m/s the leader must be doing
+    dragCut: 0.7,          // [live] fraction of linear+aero drag removed at full strength
+    cooling: 0.06,         // [live] heat/s of extra cooling at full strength
+    buildTime: 0.7,        // [live] s to reach full strength
+    fadeTime: 1.0,         // [live] s to lose it after leaving the wake
+    fovBoost: 4,           // [live] extra camera FOV (deg) while in a slipstream
+  },
+
   // ---- Heat, boost & vent --------------------------------------------------------
   // Heat is 0..1. GREEN below yellowStart. YELLOW from yellowStart to 1.0: more thrust and
   // top speed, but heat rises faster. Reaching 1.0 = OVERHEAT: engines cut for stallTime.
@@ -254,6 +288,8 @@ export const CONFIG = {
     dustRate: 90,          // [live] particles/s per pod at speed
     dustLife: 1.4,         // [live] s
     streakStart: 40,       // [live] m/s where speed streaks appear
+    wakeRate: 10,          // [live] wake particles/s behind a fast pod (more when someone drafts in it)
+    wakeAlpha: 0.07,       // [live] wake haze opacity (drafting adds to it)
   },
 
   // ---- Debug -------------------------------------------------------------------

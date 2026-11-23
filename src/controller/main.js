@@ -22,7 +22,7 @@ const S = {
 
 // ---- Haptics ------------------------------------------------------------------
 // vent: short tick. perfect: sharp triple. overheat: long double thud. wall: one hit.
-const PATTERNS = { vent: [35], perfect: [25, 45, 25, 45, 70], overheat: [280, 70, 280], wall: [30] };
+const PATTERNS = { vent: [35], perfect: [25, 45, 25, 45, 70], overheat: [280, 70, 280], wall: [30], slide: [20, 30, 45] };
 function haptic(kind) {
   try { if (navigator.vibrate && PATTERNS[kind]) navigator.vibrate(PATTERNS[kind]); } catch {}
 }

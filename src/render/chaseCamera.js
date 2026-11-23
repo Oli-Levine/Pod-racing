@@ -59,7 +59,7 @@ export class ChaseCamera {
 
     this.cam.position.set(x + sx * fz, y + sy, z - sx * fx);
     this.cam.lookAt(s.x + fx * C.lookAhead, s.y + C.lookHeight, s.z + fz * C.lookAhead);
-    const fov = C.fovBase + C.fovSpeed * Math.min(s.speed / C.fovSpeedRef, 1.2);
+    const fov = C.fovBase + C.fovSpeed * Math.min(s.speed / C.fovSpeedRef, 1.2) + CONFIG.slipstream.fovBoost * (s.slipstream || 0);
     if (Math.abs(this.cam.fov - fov) > 0.01) { this.cam.fov = fov; this.cam.updateProjectionMatrix(); }
   }
 

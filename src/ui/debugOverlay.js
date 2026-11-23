@@ -31,6 +31,7 @@ export class DebugOverlay {
         `vent      ${pod.ventCd > 0 ? 'cooldown ' + pod.ventCd.toFixed(1) + 's' : 'ready'}   thrust x${pod.thrustMult.toFixed(2)}  top-speed x${pod.falloffMult.toFixed(2)}`,
         `surface   ${pod.surface}${pod.onTrack ? '' : ' (off track)'}`,
         `hover     ${(pod.y - pod.ground.h).toFixed(2)} m  contact ${pod.contact.toFixed(2)}${pod.airborne ? '  AIRBORNE' : ''}`,
+        `skill     slide ${pod.slideState} charge ${pod.charge.toFixed(2)}   slipstream ${pod.slipstream.toFixed(2)} (drag x${pod.dragMult.toFixed(2)})`,
         `wall      ${pod.touching ? 'TOUCHING' : 'clear'}  scrape ${pod.scrape.toFixed(2)}  stuck ${pod.stuckT.toFixed(1)}s  penalty ${pod.penalty.toFixed(1)}s`,
         `progress  ${pod.progress.toFixed(0)} m   next cp ${p.lapTimer.nextCp}`,
         `input     ${lat}`);

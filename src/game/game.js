@@ -16,6 +16,7 @@ import { TuningPanel } from '../ui/tuningPanel.js';
 import { KeyboardPod } from '../input/keyboard.js';
 import { gamepads } from '../input/gamepad.js';
 import { collidePods } from '../physics/collisions.js';
+import { updateSlipstream } from '../physics/skill.js';
 import { Minimap } from '../ui/minimap.js';
 import { Results } from '../ui/results.js';
 import { resetHeat, launch } from '../physics/heat.js';
@@ -271,6 +272,7 @@ export class Game {
       this.cdLeft -= dt;
       if (this.cdLeft <= 0) this.go();
     }
+    if (this.players.length > 1) updateSlipstream(this.players.map((p) => p.pod), dt);
     for (const p of this.players) {
       p.input = this.readInput(p);
       p.pod.prevTime = this.time;
@@ -310,6 +312,7 @@ export class Game {
       s.yaw = lerpAngle(pod.pyaw, pod.yaw, alpha);
       s.pitch = lerp(pod.ppitch, pod.pitch, alpha); s.roll = lerp(pod.proll, pod.roll, alpha);
       s.vx = pod.vx; s.vz = pod.vz; s.speed = pod.speed; s.engL = pod.engL; s.engR = pod.engR;
+      s.slipstream = pod.slipstream; s.heat = pod.heat; s.stall = pod.stall;
       s.airborne = pod.airborne; s.contact = pod.contact; s.slip = pod.slip; s.surface = pod.surface; s.groundH = pod.ground.h;
       p.mesh.update(s, now / 1000);
       this.dust.emit(p, s, frameDt);
@@ -327,7 +330,7 @@ export class Game {
     this.players.forEach((p, i) => {
       const r = this.rects[i];
       p.cam.update(p.interp, frameDt, this.track);
-      p.streaks.update(p.pod.speed, frameDt);
+      p.streaks.update(p.pod.speed, frameDt, p.pod.slipstream);
       this.env.follow(p.interp.x, p.interp.y, p.interp.z);
       const cp = p.cam.cam.position;
       const [sky, sun] = this.scene.userData.skyFollow || [];
@@ -338,7 +341,7 @@ export class Game {
       this.renderer.render(this.scene, p.cam.cam);
       const lp = lobby && p.slot >= 0 ? lobby.players[p.slot] : null;
       p.hud.update(p.pod, p.lap, this.time, p.pos, this.players.length, p.pad ? 'GAMEPAD' : p.keyboard ? 'KEYBOARD' : '', now, {
-        laps: this.practice ? 0 : CONFIG.race.laps, finished: p.finished, disconnected: !p.local && lp && !lp.connected && !p.keyboard && !p.pad,
+        laps: this.practice ? 0 : CONFIG.race.laps, finished: p.finished, slipstream: p.pod.slipstream, charge: p.pod.charge, slideState: p.pod.slideState, disconnected: !p.local && lp && !lp.connected && !p.keyboard && !p.pad,
       });
     });
     this.minimap.draw(this.players);
@@ -393,6 +396,17 @@ export class Game {
       p.cam.addShake(Math.min(1.3, sp / 22));
       if (sp > 6) buzz('wall');
       if (p.pad) gamepads.rumble(p.padState, Math.min(1, sp / 30), 150);
+    } else if (e.type === 'slideRelease') {
+      p.cam.addShake(0.15 + e.charge * 0.5);
+      const n = Math.round(6 + e.charge * 26);
+      for (let i = 0; i < n; i++) {
+        const [x, y, z] = this.nozzle(s, i % 2 ? 1 : -1, 2.6);
+        const a = Math.random() * 6.28, v = 2 + Math.random() * 6 * e.charge;
+        this.dust.puff(x, y, z, -Math.sin(s.yaw) * v * 2 + Math.cos(a) * 2, 0.5 + Math.random() * 2, -Math.cos(s.yaw) * v * 2 + Math.sin(a) * 2,
+          Math.random() < 0.5 ? '#ffd9a0' : '#ffb347', 0.35 + Math.random() * 0.35, 0.6, 2, 0.9);
+      }
+      buzz('slide');
+      if (p.pad) gamepads.rumble(p.padState, 0.3 + e.charge * 0.5, 180);
     } else if (e.type === 'bump') {
       p.cam.addShake(Math.min(1.2, e.speed / 20));
       if (e.speed > 6) buzz('wall');
@@ -416,6 +430,18 @@ export class Game {
       const [x, y, z] = this.nozzle(s, Math.random() < 0.5 ? -1 : 1, 2.2);
       this.dust.puff(x, y + 0.2, z, s.vx * 0.4 + (Math.random() - 0.5) * 2, 1.5 + Math.random() * 2, s.vz * 0.4 + (Math.random() - 0.5) * 2,
         pod.stall > 0 ? '#2b2623' : '#6b625b', 1.0 + Math.random() * 0.8, 1, 5, pod.stall > 0 ? 0.55 : 0.35);
+    }
+    // wake behind every fast pod (stronger when someone is drafting in it)
+    if (s.speed > 30 && !pod.airborne) {
+      const k = Math.min(1, s.speed / 70) * CONFIG.fx.wakeRate + pod.wakeFollowed * CONFIG.fx.wakeRate * 2.5;
+      p.wakeAcc = (p.wakeAcc || 0) + k * dt;
+      const sin = Math.sin(s.yaw), cos = Math.cos(s.yaw);
+      while (p.wakeAcc >= 1) {
+        p.wakeAcc -= 1;
+        const lat = (Math.random() - 0.5) * 3.4, back = 3.4 + Math.random() * 1.2;
+        this.dust.puff(s.x - sin * back + -cos * lat, s.y + 0.1 + Math.random() * 0.6, s.z - cos * back + sin * lat,
+          s.vx * 0.8, 0.1, s.vz * 0.8, pod.wakeFollowed > 0.2 ? '#fff6e8' : '#f3dcc0', 0.55 + Math.random() * 0.3, 0.9, 3.2, CONFIG.fx.wakeAlpha + pod.wakeFollowed * CONFIG.fx.wakeAlpha * 1.6);
+      }
     }
     // continuous sparks while scraping a wall
     if (pod.scrape > 0.05) {
