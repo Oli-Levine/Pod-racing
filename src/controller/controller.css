@@ -1,0 +1,35 @@
+:root { --pc: #888; color-scheme: dark; }
+* { box-sizing: border-box; -webkit-tap-highlight-color: transparent; -webkit-touch-callout: none;
+    user-select: none; -webkit-user-select: none; touch-action: none; }
+html, body { margin: 0; height: 100%; overflow: hidden; overscroll-behavior: none; background: #14100d;
+    font: 600 14px system-ui, -apple-system, 'Segoe UI', sans-serif; color: #f4e6d0; position: fixed; inset: 0; width: 100%; }
+#app { position: absolute; inset: 0; display: flex; flex-direction: column;
+    padding: env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left); }
+#bar { flex: 0 0 44px; display: flex; align-items: center; gap: 10px; padding: 0 10px;
+    background: #231a14; border-bottom: 3px solid var(--pc); }
+#chip { display: flex; align-items: center; gap: 6px; font-size: 18px; }
+#dot { width: 16px; height: 16px; border-radius: 50%; background: #555; display: inline-block; }
+#status.ok { color: #8be04e; } #status.bad { color: #ff6b4a; }
+#ping { opacity: .8; min-width: 52px; }
+#wake { opacity: .9; } #wake.off { opacity: .25; }
+.spacer { flex: 1; }
+button { font: inherit; color: inherit; border: 0; border-radius: 8px; padding: 8px 12px; background: #3a2c22; }
+button.on { background: var(--pc); color: #1a0f08; }
+button.act { background: #ffb020; color: #1a0f08; font-weight: 800; }
+button:disabled { opacity: .35; }
+#lobbyBtns { display: flex; gap: 8px; }
+#pads { position: relative; flex: 1; display: flex; background: radial-gradient(120% 90% at 50% 100%, #2a1d14, #14100d); }
+.pad { flex: 1; }
+#padL { border-right: 1px solid #ffffff14; }
+#view { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; }
+#vent { position: absolute; left: 50%; top: 50%; width: var(--size, 96px); height: var(--size, 96px);
+    transform: translate(-50%, -50%); border-radius: 50%; font-weight: 800; letter-spacing: .08em;
+    background: #1f3a4f; border: 4px solid #5fb4e6; color: #cfeaff; }
+#vent.down { background: #5fb4e6; color: #08202f; }
+#overlay { position: fixed; inset: 0; background: #14100ddd; display: flex; align-items: center; justify-content: center; text-align: center; z-index: 5; }
+#overlay.hidden { display: none; }
+#overlayBox h2 { margin: 0 0 6px; font-size: 24px; } #overlayBox p { margin: 0 0 14px; opacity: .8; }
+#overlayBox button { font-size: 20px; padding: 14px 28px; }
+#rotate { display: none; position: fixed; inset: 0; background: #14100d; z-index: 10; align-items: center; justify-content: center;
+    text-align: center; font-size: 22px; line-height: 1.5; }
+@media (orientation: portrait) { #rotate { display: flex; } }

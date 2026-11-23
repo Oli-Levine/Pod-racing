@@ -1,0 +1,33 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Hover Pod Racing</title>
+</head>
+<body>
+  <canvas id="bg"></canvas>
+  <div id="lobby">
+    <header><h1>HOVER POD RACING</h1><div id="conn">connecting to server…</div></header>
+    <main>
+      <section id="join">
+        <canvas id="qr"></canvas>
+        <div class="scan">Scan to join</div>
+        <div id="url"></div>
+        <div id="ipnote"></div>
+      </section>
+      <section id="slots"></section>
+    </main>
+    <footer>
+      <span><kbd>Enter</kbd> start (when all ready)</span>
+      <span><kbd>Shift+Enter</kbd> start anyway</span>
+      <span><kbd>F</kbd> fullscreen</span>
+      <span><kbd>I</kbd> switch IP</span>
+      <span><kbd>Esc</kbd> back to lobby</span>
+    </footer>
+  </div>
+  <div id="race" class="hidden"></div>
+  <div id="toast"></div>
+  <script type="module" src="/src/tv/main.js"></script>
+</body>
+</html>
