@@ -28,6 +28,7 @@ export class DebugOverlay {
         `engine L  ${(inp.l * 100).toFixed(0).padStart(4)}% in  ${(pod.engL * 100).toFixed(0).padStart(4)}% out`,
         `engine R  ${(inp.r * 100).toFixed(0).padStart(4)}% in  ${(pod.engR * 100).toFixed(0).padStart(4)}% out`,
         `boost     meter ${pod.boostMeter.toFixed(2)}${pod.boost > 0.5 ? '  BOOSTING' : ''}${pod.boostLocked ? '  LOCKED (refilling)' : ''}   thrust x${pod.thrustMult.toFixed(2)}  top-speed x${pod.falloffMult.toFixed(2)}`,
+        `drift     ${pod.drift.toFixed(2)}${pod.driftHeld ? '  HELD' : ''}${pod.drifting ? '  DRIFTING' : ''}`,
         `surface   ${pod.surface}${pod.onTrack ? '' : ' (off track)'}`,
         `hover     ${(pod.y - pod.ground.h).toFixed(2)} m  contact ${pod.contact.toFixed(2)}${pod.airborne ? '  AIRBORNE' : ''}`,
         `skill     slide ${pod.slideState} charge ${pod.charge.toFixed(2)}   slipstream ${pod.slipstream.toFixed(2)} (drag x${pod.dragMult.toFixed(2)})`,

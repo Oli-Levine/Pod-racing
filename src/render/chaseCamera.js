@@ -27,7 +27,8 @@ export class ChaseCamera {
       const velYaw = Math.atan2(s.vx, s.vz);
       // don't blend toward travel direction when going backwards
       const diff = wrap(velYaw - s.yaw);
-      if (Math.abs(diff) < 2) targetYaw = s.yaw + diff * C.velocityBlend;
+      const blend = C.velocityBlend + (CONFIG.drift.cameraFollow - C.velocityBlend) * (s.drift || 0); // drifting: show the slide
+      if (Math.abs(diff) < 2) targetYaw = s.yaw + diff * blend;
     }
     if (!this.init) { this.yaw = targetYaw; this.y = s.y + C.height; this.init = true; }
     this.yaw += wrap(targetYaw - this.yaw) * (1 - Math.exp(-C.yawStiffness * dt));

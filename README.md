@@ -66,6 +66,7 @@ npm run sim -- 3        # 3 simulated phones join, ready up and wiggle their thr
 | `W` / `S` | left engine forward / reverse (keyboard test pod) |
 | `Up` / `Down` | right engine forward / reverse |
 | `Shift` | boost |
+| `Space` | drift (hold) |
 | `B` | toggle beginner assist for the keyboard pod |
 | `R` | back to the start grid with a new countdown (restarts lap timing) |
 | `T` | reset to the last checkpoint |
@@ -84,24 +85,34 @@ browsers only reveal a controller after a button press. The TV shows "Controller
 **Menu** to start. On the results screen **Menu** races again and **B** goes back to the lobby.
 Several controllers work too, and phones can still join the same race.
 
+Default layout (`gamepad.scheme: 'steer'`) - the sticks never accelerate:
+
 | Control | Action |
 | --- | --- |
-| Left stick up / down | left engine forward / reverse (analog) |
-| Right stick up / down | right engine forward / reverse (analog) |
-| LT / RT | left / right engine forward (alternative to the sticks) |
-| LB / RB | left / right engine reverse |
-| A (lobby) / B (lobby) | join as a player / leave |
+| RT | throttle (analog) |
+| LT | brake / reverse (analog) |
+| Left stick left / right | steer |
+| LB or RB (hold) | **drift** |
+| A or X (hold) | boost |
 | Y | beginner assist on / off |
-| Menu | join + start (lobby) / race again (results screen, or any time when racing solo) |
 | View | back to the last checkpoint (2 s penalty when racing others) |
-| X | boost (both engines must be pushed; or L3 + R3 together) |
+| Menu | join + start (lobby) / race again (results screen, or any time when racing solo) |
+| A / B (lobby) | join as a player / leave |
+| B (results screen) | back to the lobby |
+
+Steering is mixed into the two engines: steering right takes thrust off the right engine (and pushes it into
+reverse at full lock when you're not on the throttle - a pivot), so the pod still handles like a twin-engine pod
+under the hood. `gamepad.steerCurve` / `steerStrength` set how sharp the stick is.
+
+Alternative: `gamepad.scheme: 'tank'` in `config.js` = LT / RT drive the left / right engine, LB / RB put that
+engine in reverse, **B** (hold) drifts, A / X boost.
 
 A joined controller drives its own pod. When racing solo, a controller that hasn't joined can also take over
-the pod. It rumbles on rough landings, wall hits, bumps, slide payouts and when the boost meter runs dry. Dead zone and response curve are in `config.js` under `gamepad`.
+the pod. It rumbles on rough landings, wall hits, bumps, drift entry, slide payouts and when the boost meter runs dry. Dead zone and response curve are in `config.js` under `gamepad`.
 
 ### Tuning panel (`Tab`)
 
-Every handling, boost, hover, air, assist, surface, camera and effect value from `config.js`, changed live while
+Every handling, drift, boost, hover, air, assist, surface, camera and effect value from `config.js`, changed live while
 you drive. `,` `.` switch section, `[` `]` pick a value, `-` `=` change it (hold Shift for big steps,
 Alt for fine), `0` resets it, `C` copies all current values (changed ones listed at the top) so you can
 paste them into `config.js` - or paste them to me. Changes are not saved until they're in `config.js`;
@@ -122,7 +133,8 @@ Top bar: your colour/slot, connection status, ping, wake-lock indicator, **ASSIS
 
 ## Boost
 
-- **Boost (X on the pad, Shift on the keyboard):** with both engines pushed (at least `boost.minThrottle`), hold boost for
+- **Boost (A or X on the pad, Shift on the keyboard):** with the engines pushing forward (on average at least
+  `boost.minThrottle`), hold boost for
   +45% thrust and +20% top speed. It drains the **BOOST meter** (bottom left of the HUD): about 4 s from full.
 - **Refill:** off boost the meter refills after a 0.5 s delay, about 10 s from empty.
 - **Empty:** boost locks (red meter, "BOOST EMPTY") until the meter has refilled to 20%.
@@ -149,10 +161,31 @@ All numbers are in `config.js` under `boost` (and `race.countdown`); the tuning 
   "HIT!", with shake, phone buzz and rumble. Tuning panel tab: `bump`.
 - A phone that drops mid-race leaves its pod coasting with "PHONE DISCONNECTED"; it rejoins the same pod.
 
+## Drift
+
+Hold **LB or RB** (Space on the keyboard) at speed and the pod **floats up a little and lets go of the ground**:
+
+- Sideways grip almost disappears and sliding barely costs speed, so the pod **glides** on its momentum.
+- The travel direction swings round toward the nose on its own, keeping your speed. How hard it can pull you round
+  is capped (`drift.glideAccel`, a bit less than normal grip), so a drift takes a slightly wider line but keeps
+  much more speed than forcing a gripping turn.
+- You steer the **nose angle** with the stick. Hold it steady and the slide settles at an angle; the thrust, pointing
+  where the nose points, pulls you toward the inside. Too much rotation and you spin out (over-rotate).
+- **Release** and the pod re-grips over about 0.3 s.
+- Drifting feeds the **slide-charge**: while drifting the angle band goes up to 50 degrees and the engines only need to
+  average 50%. Hold a clean drift, then straighten out for the SLIDE BOOST kick.
+- You'll see a **DRIFT** tag, the pod banks into the slide, the camera swings out to show it, and the pad gives a small
+  bump when the drift starts. Below 10 m/s nothing happens. In the air the drift is held, so you can land into one.
+- Assist still lets you drift (it stops correcting your slide while the button is held).
+
+All values are in `config.js` under `drift`; the tuning panel has a `drift` tab. The big feel knobs:
+`grip` (lower = floatier), `align` (higher = smaller drift angle), `glideAccel` (how tight a drift can turn),
+`slipLoss` (how much speed sliding costs), `lift`.
+
 ## Skill extras
 
-- **Slide-charge:** keep a slip angle inside the **9-27 degree band** (`slide.bandLow` / `bandHigh`) at 25+ m/s with
-  **both engines thrusting** (at least 50%) and a charge builds (about 0.8 s to full). The **SLIDE bar** on the HUD fills;
+- **Slide-charge:** keep a slip angle inside the **9-27 degree band** (`slide.bandLow` / `bandHigh`; up to 50 degrees
+  while drifting) at 25+ m/s with **both engines thrusting** (at least 50%; while drifting, 50% on average) and a charge builds (about 0.8 s to full). The **SLIDE bar** on the HUD fills;
   it glows while you're in the band. **Straighten out** (slip below 5 degrees) and it pays out as a speed kick, up to
   +14 m/s at full charge ("SLIDE BOOST +x%"). Slip past the band
   (over-rotated) and the charge **drains fast** ("OVER-ROTATED"): a sloppy slide gives nothing. Lifting off the
@@ -247,3 +280,4 @@ scripts/sim-phones.js  fake phones for testing
 3. Wall collisions, out-of-bounds reset  (**done**)
 4. Multiplayer racing: split screen, pod-to-pod collisions, positions  (**done**)
 5. Skill extras: slide-charge, slipstream  (**done**)
+6. Xbox-first controls (triggers + stick steer), drift  (**done**)

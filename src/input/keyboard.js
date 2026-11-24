@@ -3,7 +3,7 @@ import { CONFIG } from '../../config.js';
 // Keyboard test pod. Tank controls, like the phone halves:
 //   W / S        left engine forward / reverse
 //   Up / Down    right engine forward / reverse
-//   Shift        boost
+//   Shift        boost          Space  drift (hold)
 //   B            toggle beginner assist
 // Keys ramp the throttle (0 -> 100% in rampTime) so you get some in-between values.
 const RAMP = 5; // per second
@@ -13,7 +13,7 @@ export class KeyboardPod {
     this.down = new Set();
     this.l = 0; this.r = 0; this.assist = false; this.lastUse = -1e9;
     addEventListener('keydown', (e) => {
-      if (['ArrowUp', 'ArrowDown'].includes(e.code)) e.preventDefault();
+      if (['ArrowUp', 'ArrowDown', 'Space'].includes(e.code)) e.preventDefault();
       if (e.repeat) return;
       this.down.add(e.code);
       if (['KeyW', 'KeyS', 'ArrowUp', 'ArrowDown'].includes(e.code)) this.lastUse = performance.now();
@@ -38,6 +38,6 @@ export class KeyboardPod {
 
   input() {
     const od = this.down.has('ShiftLeft') || this.down.has('ShiftRight') ? 3 : 0;
-    return { l: this.l, r: this.r, od, assist: this.assist, keyboard: true };
+    return { l: this.l, r: this.r, od, drift: this.down.has('Space'), assist: this.assist, keyboard: true };
   }
 }

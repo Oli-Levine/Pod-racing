@@ -2,8 +2,8 @@ import { CONFIG } from '../../config.js';
 
 // ============================================================================
 //  Boost meter. Runs before the engines each tick.
-//  Hold boost (X on the gamepad, Shift on the keyboard, both throttles in the
-//  overdrive band on a phone) with both engines pushing: thrust and top speed go
+//  Hold boost (A / X on the gamepad, Shift on the keyboard, both throttles in the
+//  overdrive band on a phone) with the engines pushing forward: thrust and top speed go
 //  up while the meter drains. Off boost the meter refills after a short delay.
 //  Emptying the meter locks boost until it has refilled to `relockAt`.
 //  Writes the effective engine commands + thrust/top-speed multipliers onto the
@@ -33,8 +33,9 @@ export function updateBoost(pod, input, dt) {
   if (pod.penalty > 0) cl = cr = 0; // serving a reset penalty: engines cut
   pod.penalty = Math.max(0, pod.penalty - dt);
 
-  // ---- boost: both engines pushing + boost held ----
-  const wantBoost = !pod.locked && pod.penalty <= 0 && input.od === 3 && cl >= B.minThrottle && cr >= B.minThrottle;
+  // ---- boost: engines pushing forward (on average) + boost held ----
+  const fwd = (Math.max(0, cl) + Math.max(0, cr)) / 2;
+  const wantBoost = !pod.locked && pod.penalty <= 0 && input.od === 3 && fwd >= B.minThrottle;
   const boosting = wantBoost && !pod.boostLocked && pod.boostMeter > 0;
   if (boosting) {
     pod.boostMeter = Math.max(0, pod.boostMeter - B.drainRate * dt);

@@ -12,12 +12,13 @@ const DEG = Math.PI / 180;
 export function applyHover(pod, g, dt) {
   const HV = CONFIG.hover, G = CONFIG.physics.gravity;
   const hh = pod.y - g.h;
-  pod.contact = clamp((HV.range - hh) / (HV.range - HV.rideHeight), 0, 1);
+  const ride = rideHeight(pod);
+  pod.contact = clamp((HV.range - hh) / (HV.range - ride), 0, 1);
   // how fast the ground under us is rising (so the damper follows terrain, and ramps launch you)
   const terrainVy = g.gx * pod.vx + g.gz * pod.vz;
   pod.terrainVy = terrainVy;
   let support = 0;
-  if (hh < HV.range) support = Math.max(0, G + HV.spring * (HV.rideHeight - hh) + HV.damping * (terrainVy - pod.vy));
+  if (hh < HV.range) support = Math.max(0, G + HV.spring * (ride - hh) + HV.damping * (terrainVy - pod.vy));
   pod.support = support;
   pod.vy += (support - G) * dt;
   // hover force pushes along the ground normal: on a slope part of it pushes
@@ -25,6 +26,9 @@ export function applyHover(pod, g, dt) {
   pod.vx -= g.gx * support * dt;
   pod.vz -= g.gz * support * dt;
 }
+
+// Ride height, raised while drifting (the pod floats).
+const rideHeight = (pod) => CONFIG.hover.rideHeight + CONFIG.drift.lift * (pod.drift || 0);
 
 // After integration: hard floor, ceilings, airborne + landing.
 export function resolveVertical(pod, g, dt) {
@@ -37,7 +41,7 @@ export function resolveVertical(pod, g, dt) {
   if (pod.y > g.ceiling - 1) { pod.y = g.ceiling - 1; if (pod.vy > 0) pod.vy = 0; }
 
   const hh = pod.y - g.h;
-  if (hh > HV.rideHeight + A.airborneAbove) {
+  if (hh > rideHeight(pod) + A.airborneAbove) {
     pod.airTime += dt;
     if (pod.airTime > 0.1) pod.airborne = true;
   } else {
@@ -77,6 +81,7 @@ export function updateVisualTilt(pod, g, dt) {
     const slopeF = g.gx * fx + g.gz * fz, slopeR = g.gx * rx + g.gz * rz;
     tp = -Math.atan(slopeF) - clamp(pod.accelF / 9.81, -2, 2) * HV.pitchPerG;
     tr = -Math.atan(slopeR) + clamp(-pod.yawRate * pod.speed / 9.81, -4, 4) * HV.leanPerG;
+    tr += -clamp(pod.slip, -0.8, 0.8) * CONFIG.drift.bank * (pod.drift || 0); // bank into the drift
   } else {
     tp = -Math.atan2(pod.vy, Math.max(pod.speed, 1)) * 0.6;
     tr = clamp(-pod.yawRate * 0.15, -0.4, 0.4);

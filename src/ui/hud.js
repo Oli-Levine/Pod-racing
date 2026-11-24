@@ -15,7 +15,7 @@ export class Hud {
     el.className = 'hud';
     el.style.setProperty('--pc', color);
     el.innerHTML = `
-      <div class="h-tl"><span class="h-name">${label}</span><span class="h-assist">ASSIST</span><span class="h-kb"></span><span class="h-slipflag">SLIPSTREAM</span></div>
+      <div class="h-tl"><span class="h-name">${label}</span><span class="h-assist">ASSIST</span><span class="h-kb"></span><span class="h-slipflag">SLIPSTREAM</span><span class="h-driftflag">DRIFT</span></div>
       <div class="h-tr">
         <div class="h-row"><span class="h-k">LAP</span><b class="h-lap">-</b><span class="h-k">POS</span><b class="h-pos">1/1</b></div>
         <div class="h-time">0:00.000</div>
@@ -42,7 +42,7 @@ export class Hud {
     const q = (c) => el.querySelector(c);
     this.n = { lap: q('.h-lap'), pos: q('.h-pos'), time: q('.h-time'), last: q('.h-last'), best: q('.h-best'),
       speed: q('.h-speed b'), assist: q('.h-assist'), kb: q('.h-kb'), pop: q('.h-pop'), secs: q('.h-secs'), boost: q('.h-boost-fill'), count: q('.h-count'), flash: q('.h-flash'), banner: q('.h-banner'),
-      slipflag: q('.h-slipflag'), chargebar: q('.h-chargebar'), chargefill: q('.h-chargefill') };
+      slipflag: q('.h-slipflag'), driftflag: q('.h-driftflag'), chargebar: q('.h-chargebar'), chargefill: q('.h-chargefill') };
     this.flashUntil = 0;
     this.popUntil = 0;
   }
@@ -110,6 +110,7 @@ export class Hud {
     n.boost.style.clipPath = `inset(0 ${(1 - pod.boostMeter) * 100}% 0 0)`;
     n.slipflag.style.display = extra.slipstream > 0.2 ? 'inline-block' : 'none';
     n.slipflag.style.opacity = 0.5 + extra.slipstream * 0.5;
+    n.driftflag.style.display = extra.drift > 0.3 ? 'inline-block' : 'none';
     n.chargefill.style.width = pod.charge * 100 + '%';
     n.chargebar.dataset.state = pod.slideState;
     this.el.classList.toggle('boosting', pod.boost > 0.5);

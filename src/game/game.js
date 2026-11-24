@@ -312,7 +312,7 @@ export class Game {
       s.yaw = lerpAngle(pod.pyaw, pod.yaw, alpha);
       s.pitch = lerp(pod.ppitch, pod.pitch, alpha); s.roll = lerp(pod.proll, pod.roll, alpha);
       s.vx = pod.vx; s.vz = pod.vz; s.speed = pod.speed; s.engL = pod.engL; s.engR = pod.engR;
-      s.slipstream = pod.slipstream; s.boost = pod.boost;
+      s.slipstream = pod.slipstream; s.boost = pod.boost; s.drift = pod.drift;
       s.airborne = pod.airborne; s.contact = pod.contact; s.slip = pod.slip; s.surface = pod.surface; s.groundH = pod.ground.h;
       p.mesh.update(s, now / 1000);
       this.dust.emit(p, s, frameDt);
@@ -341,7 +341,7 @@ export class Game {
       this.renderer.render(this.scene, p.cam.cam);
       const lp = lobby && p.slot >= 0 ? lobby.players[p.slot] : null;
       p.hud.update(p.pod, p.lap, this.time, p.pos, this.players.length, p.pad ? 'GAMEPAD' : p.keyboard ? 'KEYBOARD' : '', now, {
-        laps: this.practice ? 0 : CONFIG.race.laps, finished: p.finished, slipstream: p.pod.slipstream, charge: p.pod.charge, slideState: p.pod.slideState, disconnected: !p.local && lp && !lp.connected && !p.keyboard && !p.pad,
+        laps: this.practice ? 0 : CONFIG.race.laps, finished: p.finished, slipstream: p.pod.slipstream, drift: p.pod.drift, charge: p.pod.charge, slideState: p.pod.slideState, disconnected: !p.local && lp && !lp.connected && !p.keyboard && !p.pad,
       });
     });
     this.minimap.draw(this.players);
@@ -363,6 +363,8 @@ export class Game {
     if (e.type === 'land') {
       p.cam.addShake(0.3 + e.loss * 3);
       if (p.pad && e.loss > 0.03) gamepads.rumble(p.padState, Math.min(1, 0.3 + e.loss * 2), 200);
+    } else if (e.type === 'driftStart') {
+      if (p.pad) gamepads.rumble(p.padState, 0.25, 90);
     } else if (e.type === 'boostEmpty') {
       p.cam.addShake(0.3);
       if (p.pad) gamepads.rumble(p.padState, 0.5, 250);

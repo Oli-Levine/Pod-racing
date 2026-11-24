@@ -42,12 +42,18 @@ export const CONFIG = {
 
 
   // ---- Gamepad (Xbox / any "standard" controller in the TV browser) -----------
-  // Left stick up/down = left engine, right stick up/down = right engine.
-  // Triggers also work: LT/RT = left/right engine forward, LB/RB = that engine in reverse.
+  // scheme 'steer' (default): RT = throttle, LT = brake / reverse, left stick left/right = steer,
+  //   LB or RB (hold) = drift. Steering is mixed into the two engines (differential thrust).
+  // scheme 'tank': LT / RT = left / right engine forward, LB / RB = that engine in reverse,
+  //   B (hold) = drift. Sticks are not used for thrust in either scheme.
+  // Both: A or X = boost, Y = assist, View = reset to checkpoint, Menu = start / race again.
   gamepad: {
+    scheme: 'steer',       // 'steer' or 'tank'
     deadzone: 0.12,        // [live] stick centre dead zone
     triggerDeadzone: 0.05, // [live]
-    curve: 1.0,            // [live] 1 = linear. >1 = finer control near zero.
+    curve: 1.0,            // [live] trigger response. 1 = linear. >1 = finer control near zero.
+    steerCurve: 1.4,       // [live] steering stick response. >1 = finer control near centre.
+    steerStrength: 1.0,    // [live] full stick = this much engine difference (1 = a full pivot)
     rumble: true,          // vibrate on rough landings, wall hits, bumps, slide payouts
   },
 
@@ -201,7 +207,7 @@ export const CONFIG = {
   },
 
   // ---- Boost -----------------------------------------------------------------------
-  // Hold boost (X on the gamepad, Shift on the keyboard) with both engines pushing: more thrust
+  // Hold boost (A or X on the gamepad, Shift on the keyboard) with the engines pushing: more thrust
   // and top speed while the meter drains. Off boost the meter refills after a short delay.
   // Empty = boost is locked until the meter has refilled to relockAt.
   boost: {
@@ -211,10 +217,34 @@ export const CONFIG = {
     airRegenMult: 1.0,       // [live] refill multiplier while airborne
     relockAt: 0.20,          // [live] after running empty, boost stays locked until the meter reaches this
     startMeter: 1.0,         // [live] meter at the start line (0..1)
-    minThrottle: 0.5,        // [live] both engines must be pushed at least this hard for boost to engage
+    minThrottle: 0.5,        // [live] average forward thrust of the two engines needed for boost to engage
     thrust: 1.45,            // [live] thrust multiplier while boosting
     topSpeed: 1.2,           // [live] top-speed multiplier while boosting
     ramp: 0.15,              // [live] s, boost fades in/out over this
+  },
+
+  // ---- Drift (hold LB / RB on the gamepad, Space on the keyboard) ----------------------
+  // The pod floats up a little and lets go of the ground: sideways grip drops, sliding barely
+  // costs speed, and the nose swings freely, so momentum carries you round the corner
+  // while you point the nose (and the thrust) at the exit. Release to re-grip.
+  // Drifting feeds the slide-charge: hold an angle, straighten out, get the speed kick.
+  drift: {
+    minSpeed: 10,          // [live] m/s needed to start drifting
+    blendIn: 0.10,         // [live] s to let go of the ground
+    blendOut: 0.30,        // [live] s to re-grip after releasing
+    grip: 0.15,            // [live] fraction of sideways grip kept while drifting (lower = more glide)
+    align: 2.5,            // [live] 1/s: travel direction swings toward the nose at this x the slip angle
+                           //   (higher = smaller, tighter drift angle; lower = bigger, floatier angle)
+    glideAccel: 30,        // [live] m/s^2 cap on the glide's sideways pull, kept speed-free
+                           //   (lateralGrip is 34: the drift line is a bit wider, but you keep your speed)
+    gripResponse: 0.4,     // [live] multiplier on how fast the remaining grip acts (lower = floatier)
+    slipLoss: 0.3,         // [live] multiplier on the speed lost by sliding sideways (lower = keeps more speed)
+    yawDamping: 0.7,       // [live] multiplier on the grip yaw damping (lower = the nose swings more freely)
+    yawPower: 1.1,         // [live] multiplier on steering torque while drifting
+    lift: 0.3,             // [live] m the pod floats up while drifting
+    bank: 0.5,             // [live] visual bank into the drift, rad per rad of slip
+    cameraFollow: 0.55,    // [live] camera velocityBlend while drifting (shows the slide)
+    chargeBandHigh: 50,    // [live] deg: slide-charge over-rotation limit while drifting (slide.bandHigh otherwise)
   },
 
   // ---- Race / timing -----------------------------------------------------------

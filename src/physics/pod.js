@@ -22,6 +22,7 @@ export function createPod(slot) {
     px: 0, py: 0, pz: 0, pyaw: 0, ppitch: 0, proll: 0,
     events: [],                // landing / lap events for HUD + effects, drained by the game
     assist: false,
+    drift: 0, drifting: false, driftHeld: false,
     charge: 0, slideState: 'idle', slideOverT: 0, slipstream: 0, dragMult: 1, wakeFollowed: 0,
     touching: false, wallNx: 0, wallNz: 0, scrape: 0, hitCd: 0, stuckT: 0, stuckX: 0, stuckZ: 0, penalty: 0, resetReason: null,
     ground: {},
@@ -35,7 +36,7 @@ export function placePod(pod, pose, rideHeight) {
   pod.y = pod.py = pose.y + rideHeight;
   pod.yaw = pod.pyaw = pose.yaw;
   pod.vx = pod.vy = pod.vz = 0; pod.yawRate = 0; pod.engL = pod.engR = 0;
-  pod.pitch = pod.roll = pod.ppitch = pod.proll = 0; pod.wobble = 0; pod.kickLeft = 0; pod.boost = 0; pod.stuckT = 0; pod.stuckX = pod.x; pod.stuckZ = pod.z; pod.resetReason = null;
+  pod.pitch = pod.roll = pod.ppitch = pod.proll = 0; pod.wobble = 0; pod.kickLeft = 0; pod.boost = 0; pod.drift = 0; pod.drifting = false; pod.stuckT = 0; pod.stuckX = pod.x; pod.stuckZ = pod.z; pod.resetReason = null;
   pod.airborne = false; pod.airTime = 0; pod.contact = 1;
 }
 

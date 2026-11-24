@@ -10,15 +10,19 @@ const DEG = 180 / Math.PI;
 export function updateSlide(pod, dt) {
   const S = CONFIG.slide;
   const slipDeg = Math.abs(pod.slip) * DEG;
-  const ok = !pod.airborne && pod.contact > 0.7 && pod.speed >= S.minSpeed && !pod.locked && pod.penalty <= 0
-    && pod.cmdL >= S.minThrust && pod.cmdR >= S.minThrust;
+  // While drifting the band is wider (CONFIG.drift.chargeBandHigh) and the engines only need to
+  // average minThrust, because steering into a drift cuts the inner engine.
+  const drifting = pod.drift > 0.5;
+  const bandHigh = drifting ? CONFIG.drift.chargeBandHigh : S.bandHigh;
+  const thrustOk = drifting ? (pod.cmdL + pod.cmdR) / 2 >= S.minThrust : pod.cmdL >= S.minThrust && pod.cmdR >= S.minThrust;
+  const ok = !pod.airborne && pod.contact > 0.7 && pod.speed >= S.minSpeed && !pod.locked && pod.penalty <= 0 && thrustOk;
   let state = 'idle';
 
-  if (ok && slipDeg >= S.bandLow && slipDeg <= S.bandHigh) {
+  if (ok && slipDeg >= S.bandLow && slipDeg <= bandHigh) {
     pod.charge = Math.min(1, pod.charge + S.chargeRate * dt);
     pod.slideOverT = 0;
     state = 'charging';
-  } else if (ok && slipDeg > S.bandHigh) {
+  } else if (ok && slipDeg > bandHigh) {
     // over-rotated: the slide is sloppy, the charge drains away
     const before = pod.charge;
     pod.charge = Math.max(0, pod.charge - S.overDrain * dt);

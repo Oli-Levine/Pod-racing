@@ -3,7 +3,7 @@ import { surface } from '../track/surfaces.js';
 
 // ============================================================================
 //  Planar handling: twin-engine thrust, yaw torque with inertia, surface grip,
-//  slip speed loss, drag, top-speed curve, beginner assist.
+//  slip speed loss, drag, top-speed curve, beginner assist, drift (pod.drift 0..1).
 // ============================================================================
 
 const clamp = (v, a, b) => (v < a ? a : v > b ? b : v);
@@ -28,8 +28,10 @@ export function updateEngines(pod, input, dt) {
 }
 
 export function applyHandling(pod, g, dt) {
-  const P = CONFIG.pod, H = CONFIG.handling, A = CONFIG.air, AS = CONFIG.assist;
+  const P = CONFIG.pod, H = CONFIG.handling, A = CONFIG.air, AS = CONFIG.assist, D = CONFIG.drift;
   const c = pod.contact;
+  const d = pod.drift || 0;
+  const dmix = (v) => 1 + (v - 1) * d; // 1 when gripping -> v at full drift
   const surf = surface(g.surface);
   const fx = Math.sin(pod.yaw), fz = Math.cos(pod.yaw), rx = -fz, rz = fx;
   let vf = pod.vx * fx + pod.vz * fz;
@@ -47,11 +49,11 @@ export function applyHandling(pod, g, dt) {
   // ---- yaw: differential thrust = torque, rotation has inertia --------------
   // (torque uses raw thrust: you can still rotate at top speed)
   const torqueScale = A.yawAuthority + (1 - A.yawAuthority) * c;
-  const yawAcc = ((fr - fl) * P.engineArm / P.yawInertia) * torqueScale;
+  const yawAcc = ((fr - fl) * P.engineArm / P.yawInertia) * torqueScale * dmix(D.yawPower);
   const speed0 = Math.hypot(vf, vl);
   const slipDeg0 = speed0 > 2 ? Math.atan2(Math.abs(vl), Math.abs(vf)) / DEG : 0;
   const slide = clamp((slipDeg0 - H.slideStart) / H.slideStart, 0, 1); // 0 gripping .. 1 fully sliding
-  const gripDamp = H.gripYawDamping * Math.min((speed0 / H.gripYawRefSpeed) ** 2, 1) * (1 - H.slideYawFreedom * slide) * c * surf.grip;
+  const gripDamp = H.gripYawDamping * Math.min((speed0 / H.gripYawRefSpeed) ** 2, 1) * (1 - H.slideYawFreedom * slide) * c * surf.grip * dmix(D.yawDamping);
   const damp = H.yawDamping * c + A.yawDamping * (1 - c) + gripDamp;
   pod.yawRate += yawAcc * dt;
   pod.yawRate *= Math.exp(-damp * dt);
@@ -66,12 +68,27 @@ export function applyHandling(pod, g, dt) {
   // Grip removes sideways velocity up to a limit. Past slideStart the pod breaks
   // loose and only slideGrip of the limit is left.
   const sliding = slipDeg0 > H.slideStart;
-  const maxLat = H.lateralGrip * surf.grip * c * (sliding ? H.slideGrip : 1);
-  const want = -vl * (1 - Math.exp(-H.gripResponse * dt));
+  // Drifting: grip is a fraction of the GRIPPING limit (not stacked on slideGrip), and acts slower.
+  const gripFrac = (sliding ? H.slideGrip : 1) + (D.grip - (sliding ? H.slideGrip : 1)) * d;
+  const maxLat = H.lateralGrip * surf.grip * c * gripFrac;
+  const want = -vl * (1 - Math.exp(-H.gripResponse * dmix(D.gripResponse) * dt));
   vl += clamp(want, -maxLat * dt, maxLat * dt);
 
+  // Drift glide: swing the travel direction toward the nose WITHOUT losing speed. The swing
+  // rate grows with the slip angle (align per rad) but its sideways acceleration is capped at
+  // glideAccel, so the slip settles at an angle you hold with the nose, and momentum is kept.
+  if (d > 0 && c > 0 && vf > 0) {
+    const sp = Math.hypot(vf, vl);
+    if (sp > 1) {
+      const a = Math.atan2(vl, vf);
+      const rate = Math.min(D.align * Math.abs(a), D.glideAccel / sp) * d * c * surf.grip;
+      const a2 = a - Math.sign(a) * Math.min(Math.abs(a), rate * dt);
+      vf = sp * Math.cos(a2); vl = sp * Math.sin(a2);
+    }
+  }
+
   if (pod.assist && c > 0) { // partial slip correction: swing velocity toward the nose
-    const k = 1 - Math.exp(-AS.slipCorrect * c * dt);
+    const k = 1 - Math.exp(-AS.slipCorrect * c * (1 - d) * dt); // assist lets you drift
     const removed = vl * k;
     vl -= removed;
     vf += Math.sign(vf || 1) * Math.abs(removed) * AS.slipCorrectKeep;
@@ -80,7 +97,7 @@ export function applyHandling(pod, g, dt) {
   // ---- speed loss: slip, drag -----------------------------------------------------
   const speed = Math.hypot(vf, vl);
   const sinSlip = speed > 0.5 ? Math.abs(vl) / speed : 0;
-  const loss = H.slipSpeedLoss * sinSlip * c + (H.dragLinear + H.dragAero * speed) * pod.dragMult + surf.drag * c;
+  const loss = H.slipSpeedLoss * dmix(D.slipLoss) * sinSlip * c + (H.dragLinear + H.dragAero * speed) * pod.dragMult + surf.drag * c;
   const keep = Math.exp(-loss * dt);
   vf *= keep; vl *= keep;
 

@@ -3,10 +3,11 @@ import { CONFIG } from '../../config.js';
 // ============================================================================
 //  Gamepads (Xbox or any controller the browser reports with the "standard"
 //  layout). Each connected controller can join the lobby as its own player.
-//  Polled once per frame. Two ways to drive, use either:
-//    Sticks (tank):  left stick up/down = left engine, right stick = right engine
-//    Triggers:       LT / RT = left / right engine forward, LB / RB = reverse
-//  Buttons:  A join (lobby)   B leave (lobby) / back to lobby (results)   X boost   L3/R3 overdrive per side
+//  Polled once per frame. Control scheme is CONFIG.gamepad.scheme:
+//    'steer' (default): RT throttle, LT brake / reverse, left stick steer, LB / RB (hold) drift
+//    'tank':            LT / RT = left / right engine forward, LB / RB = reverse, B (hold) drift
+//  Sticks never give thrust. Steering is mixed into the two engines (differential thrust).
+//  Buttons:  A or X boost (race) / A join (lobby)   B leave (lobby) / back to lobby (results)
 //            Y assist on/off   View reset to checkpoint   Menu start / race again
 //  Browsers only reveal a controller after you press a button on it once.
 // ============================================================================
@@ -17,14 +18,14 @@ const NAMES = Object.fromEntries(Object.entries(B).map(([k, v]) => [v, k]));
 class PadState {
   constructor(index) {
     this.index = index; this.key = 'pad' + index; this.id = '';
-    this.l = 0; this.r = 0; this.od = 0;
+    this.l = 0; this.r = 0; this.od = 0; this.drift = false;
     this.assist = false; this.lastUse = -1e9; this.connected = false; this.prev = [];
   }
 
   get active() { return this.connected && performance.now() - this.lastUse < 1500; }
 
   input() {
-    return { l: this.l, r: this.r, od: this.od, assist: this.assist, gamepad: true };
+    return { l: this.l, r: this.r, od: this.od, drift: this.drift, assist: this.assist, gamepad: true };
   }
 }
 
@@ -62,29 +63,37 @@ class Gamepads {
       seen.add(gp.index);
       this.read(this.get(gp.index), gp);
     }
-    for (const p of this.pads.values()) if (!seen.has(p.index)) { p.connected = false; p.l = p.r = 0; p.od = 0; }
+    for (const p of this.pads.values()) if (!seen.has(p.index)) { p.connected = false; p.l = p.r = 0; p.od = 0; p.drift = false; }
   }
 
   read(st, p) {
     st.connected = true; st.id = p.id;
     const G = CONFIG.gamepad, rev = CONFIG.controller.reverseMax;
     const btn = (i) => p.buttons[i] || { pressed: false, value: 0 };
-    const shape = (v, dz) => {
-      const a = Math.abs(v);
-      if (a < dz) return 0;
-      return Math.sign(v) * Math.pow((a - dz) / (1 - dz), G.curve);
-    };
-    const stick = (axis) => {
-      const v = shape(-(p.axes[axis] || 0), G.deadzone); // up = positive
-      return v >= 0 ? v : v * rev;
-    };
-    const trig = (fwd, back) => (btn(back).pressed ? -rev : shape(btn(fwd).value, G.triggerDeadzone));
-    const pick = (a, b) => (Math.abs(a) >= Math.abs(b) ? a : b); // whichever control is pushed harder
-    st.l = pick(stick(1), trig(B.LT, B.LB));
-    st.r = pick(stick(3), trig(B.RT, B.RB));
-    st.od = (btn(B.X).pressed ? 3 : 0) | (btn(B.L3).pressed ? 1 : 0) | (btn(B.R3).pressed ? 2 : 0);
+    const trigger = (i) => Math.pow(Math.max(0, (btn(i).value - G.triggerDeadzone) / (1 - G.triggerDeadzone)), G.curve);
+    if (G.scheme === 'tank') {
+      const eng = (fwd, back) => (btn(back).pressed ? -rev : trigger(fwd));
+      st.l = eng(B.LT, B.LB);
+      st.r = eng(B.RT, B.RB);
+      st.drift = btn(B.B).pressed;
+    } else {
+      // throttle from the triggers, steering from the left stick, mixed into the two engines
+      let t = trigger(B.RT) - trigger(B.LT);
+      if (t < 0) t *= rev;
+      const sx = p.axes[0] || 0, a = Math.abs(sx);
+      const steer = a < G.deadzone ? 0 : Math.sign(sx) * Math.pow((a - G.deadzone) / (1 - G.deadzone), G.steerCurve) * G.steerStrength;
+      // steer right = more LEFT engine (yaw decreases = turning right)
+      let l = t + steer, r = t - steer;
+      if (l > 1) { r -= l - 1; l = 1; }  // keep the full difference (turn rate) by cutting the inner engine
+      if (r > 1) { l -= r - 1; r = 1; }
+      st.l = Math.max(-rev, l);
+      st.r = Math.max(-rev, r);
+      st.drift = btn(B.LB).pressed || btn(B.RB).pressed;
+    }
+    const boost = btn(B.X).pressed || btn(B.A).pressed;
+    st.od = (boost ? 3 : 0) | (btn(B.L3).pressed ? 1 : 0) | (btn(B.R3).pressed ? 2 : 0);
 
-    let used = Math.abs(st.l) > 0.02 || Math.abs(st.r) > 0.02;
+    let used = Math.abs(st.l) > 0.02 || Math.abs(st.r) > 0.02 || st.drift;
     p.buttons.forEach((b, i) => {
       if (b.pressed && !st.prev[i]) {
         used = true;
