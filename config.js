@@ -1,7 +1,7 @@
 // ============================================================================
 //  config.js  -  every tunable value lives here.
 //  Shared by the Node server, the TV page and the phone page.
-//  Each build step adds its own section (handling, heat, collisions, ...).
+//  Each build step adds its own section (handling, boost, collisions, ...).
 //  Units: metres, seconds, kilograms, newtons, radians (angles noted in degrees
 //  are converted where used). Speeds shown in the HUD are km/h.
 //  Values marked [live] can be changed while driving with the tuning panel (Tab).
@@ -48,7 +48,7 @@ export const CONFIG = {
     deadzone: 0.12,        // [live] stick centre dead zone
     triggerDeadzone: 0.05, // [live]
     curve: 1.0,            // [live] 1 = linear. >1 = finer control near zero.
-    rumble: true,          // vibrate on rough landings (and later: walls, overheat)
+    rumble: true,          // vibrate on rough landings, wall hits, bumps, slide payouts
   },
 
   // ---- Physics core --------------------------------------------------------
@@ -112,7 +112,6 @@ export const CONFIG = {
     landingWobble: 1.6,     // [live] yaw-rate kick (rad/s) per radian of misalignment
     hardLandingSpeed: 14,   // [live] m/s downward speed above which a landing costs extra
     hardLandingLoss: 0.012, // [live] fraction of speed lost per m/s above hardLandingSpeed
-    cooling: 2.2,           // [live] heat cooling multiplier in the air
   },
 
   // ---- Beginner assist (per player, toggled on the phone / B key) ---------------
@@ -137,24 +136,22 @@ export const CONFIG = {
 
   // ---- Walls, pillars, out-of-bounds ------------------------------------------------
   // Walls sit at the track edge (+ RUNOFF in the track data, currently 0). A hit is split into
-  // the speed INTO the wall (bounces back, adds heat) and the speed ALONG the wall (scrape loss).
+  // the speed INTO the wall (bounces back) and the speed ALONG the wall (scrape loss).
   // Tables are indexed by impact angle: 0 deg = parallel scrape, 90 deg = head-on.
   wall: {
     radius: 2.0,             // [live] m, pod collision radius (against walls and pillars)
     angles:       [0,    10,   25,   45,   70,   90],    // impact angle, degrees (table x-axis)
     tangentLoss:  [0.00, 0.03, 0.10, 0.25, 0.40, 0.55],  // [live] fraction of speed ALONG the wall lost per hit
     bounce:       [0.00, 0.08, 0.18, 0.30, 0.40, 0.45],  // [live] fraction of the INTO-wall speed bounced back
-    heatPerImpact: 0.0055,   // [live] heat added per m/s of into-wall speed (glancing = little, head-on = lots)
     spin: 0.10,              // [live] rad/s of yaw kick per m/s into the wall when the nose hits first
     scrapeDrag: 0.35,        // [live] 1/s extra drag while touching a wall
-    scrapeHeat: 0.0016,      // [live] heat per second per m/s of speed while scraping
     sparkRate: 70,           // [live] sparks per second at full scrape
     hitEventMin: 3,          // [live] m/s into-wall speed that counts as a hit (shake, haptic, popup)
     heavyHit: 18,            // [live] m/s into-wall speed shown as a HEAVY HIT
     // -- stuck / out of bounds -> auto reset to the last checkpoint --
     stuckDist: 4,            // [live] m: moving less than this from one spot counts as stuck
     stuckTime: 3.0,          // [live] s stuck (trying to move, or touching a wall) before the reset
-    resetPenalty: 2.0,       // [live] s frozen after any auto reset (engines cut, cools down)
+    resetPenalty: 2.0,       // [live] s frozen after any auto reset (engines cut)
     outMargin: 6,            // [live] m beyond the wall line that counts as out of bounds
   },
 
@@ -168,8 +165,6 @@ export const CONFIG = {
     rearRadius: 1.2,         // [live] m
     restitution: 0.35,       // [live] bounciness of pod-pod hits (0 = dead, 1 = full bounce)
     spinScale: 1.0,          // [live] multiplier on the spin from off-centre hits
-    sideHeat: 0.010,         // [live] heat added to the pod hit in the SIDE, per m/s of impact
-    attackerHeat: 0.25,      // [live] fraction of that heat the rammer gets too
     hitEventMin: 3,          // [live] m/s impact that counts as a hit (shake, haptics)
   },
 
@@ -189,11 +184,10 @@ export const CONFIG = {
     minCharge: 0.15,       // [live] below this the release pays nothing
     payoutKick: 14,        // [live] m/s speed kick at full charge (scales with charge)
     payoutTime: 0.3,       // [live] s the kick is spread over
-    heatRate: 0.04,        // [live] heat per second while charging (charging costs a little heat)
   },
 
   // ---- Slipstream (skill extra) -------------------------------------------------------
-  // Following close behind another pod lowers your drag and cools you slightly. Natural
+  // Following close behind another pod lowers your drag. Natural
   // catch-up: nothing changes for the leader and nobody gets rubber-banding.
   slipstream: {
     range: 40,             // [live] m behind a pod where its wake helps you
@@ -201,64 +195,32 @@ export const CONFIG = {
     width: 6.5,            // [live] m either side of the leader's line
     minSpeed: 22,          // [live] m/s the leader must be doing
     dragCut: 0.7,          // [live] fraction of linear+aero drag removed at full strength
-    cooling: 0.06,         // [live] heat/s of extra cooling at full strength
     buildTime: 0.7,        // [live] s to reach full strength
     fadeTime: 1.0,         // [live] s to lose it after leaving the wake
     fovBoost: 4,           // [live] extra camera FOV (deg) while in a slipstream
   },
 
-  // ---- Heat, boost & vent --------------------------------------------------------
-  // Heat is 0..1. GREEN below yellowStart. YELLOW from yellowStart to 1.0: more thrust and
-  // top speed, but heat rises faster. Reaching 1.0 = OVERHEAT: engines cut for stallTime.
-  heat: {
-    yellowStart: 0.5,        // [live] heat where the yellow zone begins
-    // -- gain / cooling (heat units per second) --
-    gainThrust: 0.065,       // [live] heat/s at 100% thrust on both engines (no boost)
-    reverseHeat: 0.5,        // [live] reverse thrust counts this fraction as much as forward
-    yellowGainMult: 1.5,     // [live] heat gain multiplier while in yellow
-    boostHeatMult: 5.0,      // [live] heat gain multiplier while boosting (much faster)
-    coolBase: 0.02,          // [live] passive cooling, always on
-    coolIdle: 0.16,          // [live] extra cooling when off-throttle (fades out by idleThrust)
-    idleThrust: 0.25,        // [live] thrust level below which "off-throttle" cooling kicks in
-    // air cooling multiplier is air.cooling in the air section
-    // -- yellow bonus --
-    yellowThrust: 1.12,      // [live] thrust multiplier in yellow
-    yellowTopSpeed: 1.08,    // [live] top-speed multiplier in yellow (raises the efficiency falloff speed)
-    // -- boost (push BOTH throttles into the overdrive band) --
-    boostThrust: 1.45,       // [live] thrust multiplier while boosting
-    boostTopSpeed: 1.2,      // [live] top-speed multiplier while boosting
-    boostRamp: 0.15,         // [live] s, boost fades in/out over this
-    // -- overheat --
-    stallTime: 2.0,          // [live] s engines are cut after overheating
-    restartHeat: 0.45,       // [live] heat when the engines come back
-    // -- vent (centre button) --
-    ventCooldown: 1.8,       // [live] s before you can vent again (also after a wasted vent)
-    ventKickTime: 0.25,      // [live] s the speed kick is spread over
-    ventGreenDump: 0.04,     // [live] vent in green: almost nothing
-    ventGreenKick: 0.8,      // [live] m/s
-    ventDump: 0.30,          // [live] vent in yellow (outside the perfect band): heat removed
-    ventKick: 4.5,           // [live] m/s speed kick
-    perfectLow: 0.78,        // [live] perfect vent band start (inside yellow, narrow)
-    perfectHigh: 0.90,       // [live] perfect vent band end
-    perfectDump: 0.50,       // [live] heat removed by a perfect vent
-    perfectKick: 12,         // [live] m/s speed kick for a perfect vent
-    // Keyboard / gamepad can't "lift a thumb", so venting there briefly cuts both engines:
-    ventLocalTime: 0.4,      // [live] s
-    ventLocalCut: 0.6,       // [live] fraction of thrust lost during that time
-    // -- timed start (heat during the countdown) --
-    revHeatRate: 0.30,       // [live] heat/s at full throttle while held on the grid
-    startLow: 0.55,          // [live] launch-boost sweet spot (heat at GO)
-    startHigh: 0.72,         // [live]
-    launchKick: 6,           // [live] m/s kick at GO
-    launchThrust: 1.3,       // [live] thrust multiplier for launchTime
-    launchTime: 2.0,         // [live] s
-    // heat >= 1.0 during the countdown floods the engine: stalled stallTime at GO
+  // ---- Boost -----------------------------------------------------------------------
+  // Hold boost (X on the gamepad, Shift on the keyboard) with both engines pushing: more thrust
+  // and top speed while the meter drains. Off boost the meter refills after a short delay.
+  // Empty = boost is locked until the meter has refilled to relockAt.
+  boost: {
+    drainRate: 0.25,         // [live] meter (0..1) lost per second while boosting (0.25 = 4 s from full)
+    regenRate: 0.10,         // [live] meter regained per second off boost (0.10 = 10 s from empty)
+    regenDelay: 0.5,         // [live] s after releasing boost before the meter starts refilling
+    airRegenMult: 1.0,       // [live] refill multiplier while airborne
+    relockAt: 0.20,          // [live] after running empty, boost stays locked until the meter reaches this
+    startMeter: 1.0,         // [live] meter at the start line (0..1)
+    minThrottle: 0.5,        // [live] both engines must be pushed at least this hard for boost to engage
+    thrust: 1.45,            // [live] thrust multiplier while boosting
+    topSpeed: 1.2,           // [live] top-speed multiplier while boosting
+    ramp: 0.15,              // [live] s, boost fades in/out over this
   },
 
   // ---- Race / timing -----------------------------------------------------------
   race: {
     laps: 3,                 // laps per race (2+ players). 0 = endless practice for everyone.
-    countdown: 4,            // [live] s of timed-start countdown (READY, 3, 2, 1, GO). 0 = no countdown.
+    countdown: 4,            // [live] s of start countdown (READY, 3, 2, 1, GO). Pods are held on the grid. 0 = no countdown.
     practiceWhenSolo: true,  // one player = endless practice laps (no finish / results)
     finishTimeout: 30,       // [live] s after the winner finishes before results are shown anyway
   },

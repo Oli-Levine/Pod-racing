@@ -3,7 +3,7 @@ import { CONFIG } from '../../config.js';
 // Keyboard test pod. Tank controls, like the phone halves:
 //   W / S        left engine forward / reverse
 //   Up / Down    right engine forward / reverse
-//   Shift        overdrive (boost, step 2)    Space  vent (step 2)
+//   Shift        boost
 //   B            toggle beginner assist
 // Keys ramp the throttle (0 -> 100% in rampTime) so you get some in-between values.
 const RAMP = 5; // per second
@@ -11,13 +11,12 @@ const RAMP = 5; // per second
 export class KeyboardPod {
   constructor() {
     this.down = new Set();
-    this.l = 0; this.r = 0; this.assist = false; this.ventCount = 0; this.lastUse = -1e9;
+    this.l = 0; this.r = 0; this.assist = false; this.lastUse = -1e9;
     addEventListener('keydown', (e) => {
-      if (['ArrowUp', 'ArrowDown', 'Space'].includes(e.code)) e.preventDefault();
+      if (['ArrowUp', 'ArrowDown'].includes(e.code)) e.preventDefault();
       if (e.repeat) return;
       this.down.add(e.code);
       if (['KeyW', 'KeyS', 'ArrowUp', 'ArrowDown'].includes(e.code)) this.lastUse = performance.now();
-      if (e.code === 'Space') this.ventCount++;
       if (e.code === 'KeyB') this.assist = !this.assist;
     });
     addEventListener('keyup', (e) => this.down.delete(e.code));
@@ -39,6 +38,6 @@ export class KeyboardPod {
 
   input() {
     const od = this.down.has('ShiftLeft') || this.down.has('ShiftRight') ? 3 : 0;
-    return { l: this.l, r: this.r, od, vent: this.down.has('Space'), ventCount: this.ventCount, assist: this.assist, keyboard: true };
+    return { l: this.l, r: this.r, od, assist: this.assist, keyboard: true };
   }
 }

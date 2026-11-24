@@ -1,4 +1,4 @@
-// Per-viewport HUD: speed, heat gauge, lap, position, lap times, sector splits,
+// Per-viewport HUD: speed, boost meter, lap, position, lap times, sector splits,
 // landing feedback. DOM overlay positioned over the viewport.
 import { CONFIG } from '../../config.js';
 
@@ -26,14 +26,10 @@ export class Hud {
       <div class="h-bl">
         <div class="h-speed"><b>0</b><span>km/h</span></div>
         <div class="h-gauge">
-          <div class="h-heat">
-            <div class="h-heat-fill"></div>
-            <div class="h-band h-perfect"></div>
-            <div class="h-band h-win"></div>
-            <div class="h-mark h-yellowmark"></div>
-            <span>HEAT</span>
+          <div class="h-boost">
+            <div class="h-boost-fill"></div>
+            <span>BOOST</span>
           </div>
-          <div class="h-ventbar"><div class="h-ventfill"></div><span>VENT</span></div>
           <div class="h-chargebar"><div class="h-chargefill"></div><span>SLIDE</span></div>
         </div>
       </div>
@@ -45,13 +41,8 @@ export class Hud {
     this.el = el;
     const q = (c) => el.querySelector(c);
     this.n = { lap: q('.h-lap'), pos: q('.h-pos'), time: q('.h-time'), last: q('.h-last'), best: q('.h-best'),
-      speed: q('.h-speed b'), assist: q('.h-assist'), kb: q('.h-kb'), pop: q('.h-pop'), secs: q('.h-secs'), heat: q('.h-heat-fill'), count: q('.h-count'), flash: q('.h-flash'), banner: q('.h-banner'),
-      win: q('.h-win'), ventfill: q('.h-ventfill'), ventbar: q('.h-ventbar'),
+      speed: q('.h-speed b'), assist: q('.h-assist'), kb: q('.h-kb'), pop: q('.h-pop'), secs: q('.h-secs'), boost: q('.h-boost-fill'), count: q('.h-count'), flash: q('.h-flash'), banner: q('.h-banner'),
       slipflag: q('.h-slipflag'), chargebar: q('.h-chargebar'), chargefill: q('.h-chargefill') };
-    const H = CONFIG.heat;
-    const pos = (el, a, b) => { el.style.left = a * 100 + '%'; el.style.width = (b - a) * 100 + '%'; };
-    pos(q('.h-perfect'), H.perfectLow, H.perfectHigh); pos(this.n.win, H.startLow, H.startHigh);
-    q('.h-yellowmark').style.left = H.yellowStart * 100 + '%';
     this.flashUntil = 0;
     this.popUntil = 0;
   }
@@ -80,19 +71,11 @@ export class Hud {
       this.popup(e.text, '', now, 1000);
     } else if (e.type === 'wall') {
       if (e.speed >= CONFIG.wall.heavyHit) this.popup(`HEAVY HIT  -${Math.round(e.lossFrac * 100)}%`, 'bad', now, 1000);
-    } else if (e.type === 'vent') {
-      if (e.kind === 'perfect') { this.popup('PERFECT VENT!', 'perfect', now, 1300); this.flash('perfect', now); }
-      else if (e.kind === 'green') this.popup('VENT (too cold)', 'bad', now, 800);
-      else this.popup(e.kind === 'early' ? 'VENT - early' : 'VENT - late', '', now, 800);
-    } else if (e.type === 'overheat') { this.popup('OVERHEAT!', 'bad', now, 2000); this.flash('hot', now); }
-    else if (e.type === 'recover') { this.popup('ENGINES BACK', 'good', now, 700); }
-    else if (e.type === 'launch') { this.popup('LAUNCH BOOST!', 'perfect', now, 1500); this.flash('perfect', now); }
-    else if (e.type === 'flood') { this.popup('ENGINE FLOODED!', 'bad', now, 2000); this.flash('hot', now); }
-    else if (e.type === 'slowstart') { this.popup('SLOW START', 'bad', now, 1000); }
+    } else if (e.type === 'boostEmpty') { this.popup('BOOST EMPTY', 'bad', now, 900); }
     else if (e.type === 'slideRelease') { this.popup(`SLIDE BOOST +${Math.round(e.charge * 100)}%`, 'perfect', now, 1000); }
     else if (e.type === 'slideLost') { this.popup('OVER-ROTATED', 'bad', now, 800); }
     else if (e.type === 'bump') {
-      if (e.victim && e.heat > 0.04) this.popup(`RAMMED  +${Math.round(e.heat * 100)} HEAT`, 'bad', now, 900);
+      if (e.victim && e.speed > 8) this.popup('RAMMED!', 'bad', now, 900);
       else if (!e.victim && e.speed > 8) this.popup('HIT!', '', now, 600);
     }
   }
@@ -107,7 +90,6 @@ export class Hud {
     this.n.count.textContent = cd.text || '';
     this.n.count.classList.toggle('show', !!cd.text);
     this.n.count.dataset.kind = cd.kind || '';
-    this.el.classList.toggle('counting', !!cd.window);
   }
 
   update(pod, lap, time, pos, total, localDevice, now, extra = {}) {
@@ -125,16 +107,13 @@ export class Hud {
     n.assist.style.display = pod.assist ? '' : 'none';
     n.kb.style.display = localDevice ? '' : 'none';
     if (n.kb.textContent !== localDevice) n.kb.textContent = localDevice;
-    n.heat.style.clipPath = `inset(0 ${(1 - pod.heat) * 100}% 0 0)`;
-    n.ventfill.style.width = (1 - pod.ventCd / CONFIG.heat.ventCooldown) * 100 + '%';
-    n.ventbar.classList.toggle('ready', pod.ventCd <= 0 && pod.stall <= 0);
+    n.boost.style.clipPath = `inset(0 ${(1 - pod.boostMeter) * 100}% 0 0)`;
     n.slipflag.style.display = extra.slipstream > 0.2 ? 'inline-block' : 'none';
     n.slipflag.style.opacity = 0.5 + extra.slipstream * 0.5;
     n.chargefill.style.width = pod.charge * 100 + '%';
     n.chargebar.dataset.state = pod.slideState;
-    this.el.classList.toggle('stalled', pod.stall > 0);
     this.el.classList.toggle('boosting', pod.boost > 0.5);
-    this.el.classList.toggle('hot', pod.heat > 0.9 && pod.stall <= 0);
+    this.el.classList.toggle('boostLocked', pod.boostLocked);
     const secs = lap.bestSectors.map((t, i) => `S${i + 1} ${t.toFixed(2)}`).join('  ');
     if (n.secs.textContent !== secs) n.secs.textContent = secs;
     if (now > this.popUntil) n.pop.classList.remove('show');

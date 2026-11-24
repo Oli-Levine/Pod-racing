@@ -7,9 +7,8 @@ import * as THREE from 'three';
 //  Origin = physics centre. +Z = forward.
 // ============================================================================
 
-import { CONFIG } from '../../config.js';
 
-const COOL = new THREE.Color('#bfe6ff'), AMBER = new THREE.Color('#ffa83a'), RED = new THREE.Color('#ff2410');
+const COOL = new THREE.Color('#bfe6ff'), AMBER = new THREE.Color('#ffa83a');
 const mat = (color, extra = {}) => new THREE.MeshStandardMaterial({ color, flatShading: true, roughness: 0.75, metalness: 0.25, ...extra });
 
 export function createPodMesh(color) {
@@ -95,11 +94,9 @@ export function createPodMesh(color) {
 
   return {
     root, engines,
-    // engine glow colour from heat: cool blue-white -> amber -> angry red
-    glowColor(heat, out) {
-      const Y = CONFIG.heat.yellowStart;
-      if (heat < Y) return out.copy(COOL).lerp(AMBER, Math.pow(Math.max(0, heat - Y * 0.55) / (Y * 0.45), 1.5));
-      return out.copy(AMBER).lerp(RED, Math.min(1, (heat - Y) / (1 - Y)));
+    // engine glow colour: cool blue-white, shifting to amber while boosting
+    glowColor(boost, out) {
+      return out.copy(COOL).lerp(AMBER, Math.min(1, boost));
     },
     update(state, time) {
       root.position.set(state.x, state.y, state.z);
@@ -107,18 +104,11 @@ export function createPodMesh(color) {
       body.rotation.x = state.pitch;
       body.rotation.z = state.roll;
       const thr = [state.engR, state.engL]; // engines[0] is at -X = the pod's RIGHT (forward is +Z)
-      this.glowColor(state.heat, exhaustMat.color);
-      const sputter = state.stall > 0 ? 1 : Math.max(0, (state.heat - 0.88) / 0.12);
+      this.glowColor(state.boost, exhaustMat.color);
       engines.forEach((e, i) => {
         e.core.material.color.copy(exhaustMat.color);
-        let t = Math.max(0, thr[i]);
-        let flick = 0.85 + 0.15 * Math.sin(time * 60 + i * 2);
-        if (sputter > 0) { // angry sputtering: flame chops in and out
-          const n = Math.sin(time * 47 + i * 5.3) * Math.sin(time * 31.7 + i);
-          flick *= n > 1 - sputter * 1.4 ? 0.1 : 1;
-          if (state.stall > 0) t *= Math.max(0, Math.sin(time * 9 + i * 3) - 0.6) * 0.8;
-        }
-        e.sputtering = sputter > 0;
+        const t = Math.max(0, thr[i]) * (1 + 0.35 * state.boost);
+        const flick = 0.85 + 0.15 * Math.sin(time * 60 + i * 2);
         e.flame.scale.set(0.6 + t * 0.5, 0.3 + t * 2.6 * flick, 0.6 + t * 0.5);
         e.flame.position.z = -2.5 - (0.15 + t * 1.3 * flick);
         e.core.material.opacity = 0.35 + t * 0.6;

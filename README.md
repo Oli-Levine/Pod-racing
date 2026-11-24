@@ -1,16 +1,18 @@
 # Hover Pod Racing
 
 Couch multiplayer hover-pod racing for 1-4 players (player count is a config value).
-The laptop runs the game fullscreen in a browser on the TV; phones are the controllers.
-Everything runs on your home Wi-Fi - no internet or accounts needed once installed.
+The laptop runs the game fullscreen in a browser on the TV. **Xbox controllers are the main way to play**
+(plug them into the laptop); phones still work as controllers but their UI is parked (see "Phone controller").
+No internet or accounts needed once installed.
 
-**Status: all 5 steps built** - handling, test track, laps, tuning panel, heat / boost / vent / timed start, walls and resets,
+**Status: steps 0-5 built, then reworked:** the heat / vent / overheat / timed-start system was removed and boost now
+runs on a simple meter. Built: handling, test track, laps, tuning panel, boost meter, walls and resets,
 multiplayer racing for 1-4 players (split screen, pod-to-pod collisions, positions, results), and the skill extras
 (slide-charge, slipstream).
 
 ## How it works
 
-- `net/server.js` (Node + `ws`) serves the files and relays phone input. It does **no** game logic.
+- `net/server.js` (Node + `ws`) serves the files and relays phone input (only needed for phones). It does **no** game logic.
 - Physics and rendering will run in the TV browser page (Three.js, fixed 120 Hz timestep).
 - Phones send input ~60 Hz with a sequence number; the TV uses the latest input per player.
 - A phone stores a player id in `localStorage`, so a dropped phone rejoins the same slot.
@@ -33,10 +35,10 @@ npm run dev      # Vite dev server with hot reload, same single port
 
 Then:
 
-1. Open **http://localhost:3000/** on the laptop (press `F` for fullscreen, HDMI to the TV).
-2. The terminal also prints the phone URL and a QR code, e.g. `http://192.168.1.23:3000/controller.html`.
-3. On each phone scan the QR code on the TV, tap **TAP TO START**, hold the phone in landscape.
-4. Tap **READY** on each phone. Start with **Enter** on the laptop, or **START** on player 1's phone.
+1. Connect the Xbox controller(s) to the laptop, open **http://localhost:3000/** (press `F` for fullscreen, HDMI to the TV).
+2. Press **A** on each controller to join (controllers are always ready). Press **Menu** to start.
+3. Phones (optional): the terminal and the lobby show a QR code / URL such as `http://192.168.1.23:3000/controller.html`.
+   Scan it, tap **TAP TO START**, hold the phone in landscape, tap **READY**.
 
 Change the port with `PORT=4000 npm start`. If the wrong IP is detected, press `I` on the TV to cycle
 addresses, or run `HOST_IP=192.168.1.23 npm start`.
@@ -63,10 +65,9 @@ npm run sim -- 3        # 3 simulated phones join, ready up and wiggle their thr
 | --- | --- |
 | `W` / `S` | left engine forward / reverse (keyboard test pod) |
 | `Up` / `Down` | right engine forward / reverse |
-| `Shift` | boost (both engines in overdrive) |
-| `Space` | vent |
+| `Shift` | boost |
 | `B` | toggle beginner assist for the keyboard pod |
-| `R` | back to the start grid with a new timed-start countdown (restarts lap timing) |
+| `R` | back to the start grid with a new countdown (restarts lap timing) |
 | `T` | reset to the last checkpoint |
 | `` ` `` | debug overlay (speed, slip, yaw rate, engines, surface, hover, input latency) |
 | `1`-`9`, `0` | with the debug overlay open: teleport to a test section (cancels the current lap) |
@@ -80,7 +81,8 @@ Connect the controller to the laptop (Bluetooth or USB), open the game, then **p
 browsers only reveal a controller after a button press. The TV shows "Controller connected".
 
 **Each controller is its own player:** in the lobby press **A** to take a slot (it is always ready), **B** to leave,
-**Menu** to start. Controllers and phones race together; several controllers work too.
+**Menu** to start. On the results screen **Menu** races again and **B** goes back to the lobby.
+Several controllers work too, and phones can still join the same race.
 
 | Control | Action |
 | --- | --- |
@@ -92,15 +94,14 @@ browsers only reveal a controller after a button press. The TV shows "Controller
 | Y | beginner assist on / off |
 | Menu | join + start (lobby) / race again (results screen, or any time when racing solo) |
 | View | back to the last checkpoint (2 s penalty when racing others) |
-| A | vent |
-| X | boost (or L3 / R3 for overdrive per side) |
+| X | boost (both engines must be pushed; or L3 + R3 together) |
 
 A joined controller drives its own pod. When racing solo, a controller that hasn't joined can also take over
-the pod. It rumbles on rough landings, wall hits, bumps, vents and overheats. Dead zone and response curve are in `config.js` under `gamepad`.
+the pod. It rumbles on rough landings, wall hits, bumps, slide payouts and when the boost meter runs dry. Dead zone and response curve are in `config.js` under `gamepad`.
 
 ### Tuning panel (`Tab`)
 
-Every handling, hover, air, assist, surface, camera and effect value from `config.js`, changed live while
+Every handling, boost, hover, air, assist, surface, camera and effect value from `config.js`, changed live while
 you drive. `,` `.` switch section, `[` `]` pick a value, `-` `=` change it (hold Shift for big steps,
 Alt for fine), `0` resets it, `C` copies all current values (changed ones listed at the top) so you can
 paste them into `config.js` - or paste them to me. Changes are not saved until they're in `config.js`;
@@ -108,37 +109,28 @@ reloading the page goes back to the file.
 
 Each key also has an on-screen button for touch screens.
 
-## Phone controller
+## Phone controller (parked)
+
+Phones still connect and drive, but the phone UI has not been updated for the boost rework: its **VENT** button
+now does nothing and its background tint stays green. Only the TV and the Xbox controller are being developed.
 
 Landscape only. Each half of the screen is an **analog throttle** for that engine: touch anywhere in the
 half, then slide your thumb **up** for thrust (full at 90 px, **overdrive** band at 135 px) or **down** for
-reverse (-40% at 55 px). The zero point is where your thumb first lands. If you touch very near the top
-edge the zero point is nudged down so the full range stays reachable (so thrust starts slightly above zero).
-Overdrive on **both** sides = boost. The centre button is **VENT**; the whole screen tints green / yellow / red
-with heat, and on Android the phone vibrates for vent, perfect vent and overheat.
-All distances live in `config.js` under `controller`.
+reverse (-40% at 55 px). The zero point is where your thumb first lands. Overdrive on **both** sides = boost.
+Top bar: your colour/slot, connection status, ping, wake-lock indicator, **ASSIST** toggle, and in the lobby
+**READY / START / LEAVE**. All distances live in `config.js` under `controller`.
 
-Top bar: your colour/slot, connection status, ping, wake-lock indicator (☀), **ASSIST** toggle (beginner
-assist, used from step 1), and in the lobby **READY / START / LEAVE**.
+## Boost
 
-## Heat, boost and vent
+- **Boost (X on the pad, Shift on the keyboard):** with both engines pushed (at least `boost.minThrottle`), hold boost for
+  +45% thrust and +20% top speed. It drains the **BOOST meter** (bottom left of the HUD): about 4 s from full.
+- **Refill:** off boost the meter refills after a 0.5 s delay, about 10 s from empty.
+- **Empty:** boost locks (red meter, "BOOST EMPTY") until the meter has refilled to 20%.
+- Every race starts with a full meter. The engine glow turns amber while boosting.
+- There is no heat, venting, overheating or timed start any more: the countdown just holds the pods on the grid.
+  Wall scrapes and pod-to-pod hits cost speed and spin, not heat.
 
-- **Heat (0-1)** rises with thrust. **Green** (below 0.5): normal. **Yellow** (0.5-1.0): more thrust and top speed,
-  but heat rises 1.5x faster. **Red** (1.0): **overheat**, engines cut for 2 s, the pod coasts and smokes.
-- **Boost:** push *both* throttles into the overdrive band. Big thrust and top speed, heat 5x faster - only a few seconds.
-- **Cooling** is faster off-throttle and while airborne.
-- **Vent** (centre button) dumps heat and gives a speed kick; cooldown 1.8 s, and it applies even to a wasted vent.
-  In green it does almost nothing. In yellow it dumps 0.30 heat. A **perfect vent** (narrow band inside yellow, shown
-  as a white box on the TV heat gauge) dumps 0.50 and kicks about 3x harder, with a flash. The HUD tells you
-  "early" or "late" when you miss the band.
-  On a phone, pressing vent means lifting a thumb, so you lose that engine for a moment. Keyboard / gamepad can't
-  do that, so a vent there briefly cuts both engines instead (`heat.ventLocalCut` / `ventLocalTime`).
-- **Timed start:** during the countdown (READY, 3, 2, 1, GO) the pod is held on the grid but you can rev. Hold heat
-  inside the **blue band** on the gauge when it says GO for a launch boost. Revving into red floods the engine:
-  you stall for 2 s on the line. Phones and gamepad sticks can hold a partial throttle; on the keyboard, tap the keys.
-- Engine glow goes cool blue-white, amber, angry red, then sputters. `R` restarts the countdown.
-
-All numbers are in `config.js` under `heat` (and `air.cooling`, `race.countdown`); the tuning panel has a `heat` tab.
+All numbers are in `config.js` under `boost` (and `race.countdown`); the tuning panel has a `boost` tab.
 
 ## Multiplayer racing
 
@@ -153,9 +145,8 @@ All numbers are in `config.js` under `heat` (and `air.cooling`, `race.countdown`
   **Enter**, **Menu** on a controller, or **RACE AGAIN** on the host phone restarts; **Esc** goes to the lobby.
 - **Solo** (one player) stays endless practice with lap times (`race.practiceWhenSolo`).
 - **Pod-to-pod hits:** each pod is two circles (engines + cockpit). Hits exchange momentum by mass and relative
-  speed; a hit away from the centre (e.g. on the cockpit) spins the pod. The pod hit in the **side** gains heat
-  (`bump.sideHeat`), the rammer gains a little (`bump.attackerHeat`) - ramming someone toward overheat is a tactic.
-  Shown as "RAMMED +x HEAT" / "HIT!", with shake, phone buzz and rumble. Tuning panel tab: `bump`.
+  speed; a hit away from the centre (e.g. on the cockpit) spins the pod. Shown as "RAMMED!" /
+  "HIT!", with shake, phone buzz and rumble. Tuning panel tab: `bump`.
 - A phone that drops mid-race leaves its pod coasting with "PHONE DISCONNECTED"; it rejoins the same pod.
 
 ## Skill extras
@@ -163,12 +154,12 @@ All numbers are in `config.js` under `heat` (and `air.cooling`, `race.countdown`
 - **Slide-charge:** keep a slip angle inside the **9-27 degree band** (`slide.bandLow` / `bandHigh`) at 25+ m/s with
   **both engines thrusting** (at least 50%) and a charge builds (about 0.8 s to full). The **SLIDE bar** on the HUD fills;
   it glows while you're in the band. **Straighten out** (slip below 5 degrees) and it pays out as a speed kick, up to
-  +14 m/s at full charge ("SLIDE BOOST +x%"). Charging costs a little heat. Slip past the band
+  +14 m/s at full charge ("SLIDE BOOST +x%"). Slip past the band
   (over-rotated) and the charge **drains fast** ("OVER-ROTATED"): a sloppy slide gives nothing. Lifting off the
   throttle or leaving the ground fades it. Salt and sand patches make slides easier to start; assist stops most slides,
   so it can't earn much.
-- **Slipstream:** follow within 40 m of another pod, near its line, and your **drag drops (up to 70%)** and you
-  **cool a little** (`slipstream.*`). It builds over 0.7 s and fades over 1 s. You'll see a **SLIPSTREAM** tag, a wider
+- **Slipstream:** follow within 40 m of another pod, near its line, and your **drag drops (up to 70%)**.
+  (`slipstream.*`) It builds over 0.7 s and fades over 1 s. You'll see a **SLIPSTREAM** tag, a wider
   field of view, extra speed lines, and a hazy **wake** behind the pod in front. Nothing changes for the leader and
   nobody is rubber-banded: it's natural catch-up, and the slingshot passes work because drag stays low as you pull out.
 - Tuning panel tabs: `slide` and `slipstream`. Debug overlay (`` ` ``) shows slide state, charge and slipstream strength.
@@ -179,14 +170,13 @@ All numbers are in `config.js` under `heat` (and `air.cooling`, `race.countdown`
   **Pillars** in the slalom are solid too. The camera is kept inside the walls. Pods have a collision radius (`wall.radius`, 2 m).
 - A hit is split into the speed *into* the wall and the speed *along* it, both by **impact angle** (tables in
   `config.js` under `wall`: 0 deg = scrape, 90 deg = head-on):
-  - glancing scrape (about 10 deg): loses ~3% of speed, no bounce, almost no heat
+  - glancing scrape (about 10 deg): loses ~3% of speed, no bounce
   - 45 deg: loses ~25% along the wall and bounces ~30% of the into-wall speed
-  - head-on: loses ~55%, bounces back, and adds the most heat (`wall.heatPerImpact`)
+  - head-on: loses ~55%, bounces back
   - nose-first hits spin the nose away from the wall
-- **Scraping** along a wall adds drag, heat (`wall.scrapeHeat`) and throws sparks. A hard enough hit can push you
-  into overheat. Heavy hits show "HEAVY HIT -x%".
+- **Scraping** along a wall adds drag and throws sparks. Heavy hits show "HEAVY HIT -x%".
 - **Auto reset** to the last checkpoint (facing along the track, centre line) with a frozen **2 s penalty**
-  (engines cut, the pod cools) when you:
+  (engines cut) when you:
   - leave the world / go well beyond the run-off ("OUT OF BOUNDS"), or
   - are **stuck**: trying to move (throttle or pushed against a wall) but staying within 4 m of the same spot for 3 s.
     Standing still with no throttle, spinning on the spot, stalls and the countdown do not count.
@@ -253,7 +243,7 @@ scripts/sim-phones.js  fake phones for testing
 
 0. Scaffold, lobby, controller, live throttle bars  (**done**)
 1. Core handling + hover + air control + test track + chase camera + laps + debug overlay + tuning panel  (**done**)
-2. Heat, boost, vent, perfect vent, timed start  (**done**)
+2. Heat, boost, vent, perfect vent, timed start  (**done**, then heat / vent / timed start removed; boost is now a meter)
 3. Wall collisions, out-of-bounds reset  (**done**)
 4. Multiplayer racing: split screen, pod-to-pod collisions, positions  (**done**)
 5. Skill extras: slide-charge, slipstream  (**done**)

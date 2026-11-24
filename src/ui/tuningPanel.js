@@ -11,7 +11,7 @@ import { CONFIG } from '../../config.js';
 //  Changes are NOT saved: reload the page to go back to config.js.
 // ============================================================================
 
-const SECTIONS = ['handling', 'heat', 'slide', 'slipstream', 'wall', 'bump', 'pod', 'hover', 'air', 'assist', 'surfaces', 'physics', 'camera', 'fx', 'race'];
+const SECTIONS = ['handling', 'boost', 'slide', 'slipstream', 'wall', 'bump', 'pod', 'hover', 'air', 'assist', 'surfaces', 'physics', 'camera', 'fx', 'race'];
 const SKIP = new Set(['hz', 'maxStepsPerFrame', 'near', 'far', 'laps']);
 
 function collect() {

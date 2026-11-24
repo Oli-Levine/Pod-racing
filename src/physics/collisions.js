@@ -3,7 +3,7 @@ import { CONFIG } from '../../config.js';
 // ============================================================================
 //  Walls + pillars + stuck / out-of-bounds detection.
 //  Walls are where the sand run-off ends. A hit is resolved by splitting the
-//  velocity into the part INTO the wall (bounces back by `bounce`, adds heat)
+//  velocity into the part INTO the wall (bounces back by `bounce`)
 //  and the part ALONG it (loses `tangentLoss`). Both depend on impact angle
 //  (config.wall tables), so a glancing scrape is cheap and a head-on is not.
 // ============================================================================
@@ -40,9 +40,6 @@ function contact(pod, nx, nz, pen, kind) {
   const tx = pod.vx - vn * nx, tz = pod.vz - vn * nz; // along-wall velocity
   pod.vx = tx * (1 - loss) + nx * vi * bounce;
   pod.vz = tz * (1 - loss) + nz * vi * bounce;
-
-  // heat from the hit (heat >= 1 will overheat the pod on the next tick)
-  pod.heat = Math.min(1, pod.heat + W.heatPerImpact * vi);
 
   // nose-first hits spin the nose away from the wall
   const fx = Math.sin(pod.yaw), fz = Math.cos(pod.yaw);
@@ -82,7 +79,7 @@ export function collide(pod, g, track, dt) {
     }
   }
 
-  // -- scraping: drag, heat and sparks while touching --
+  // -- scraping: drag and sparks while touching --
   const speed = Math.hypot(pod.vx, pod.vz);
   pod.scrape = 0;
   if (pod.touching) {
@@ -92,7 +89,6 @@ export function collide(pod, g, track, dt) {
     if (along > 1) {
       const k = Math.exp(-W.scrapeDrag * dt);
       pod.vx *= k; pod.vz *= k;
-      pod.heat = Math.min(1, pod.heat + W.scrapeHeat * along * dt);
     }
   }
 }
@@ -104,11 +100,11 @@ export function checkReset(pod, g, track, dt) {
   if (g.path && g.edge > track.runoff + W.outMargin) { pod.resetReason = 'out'; return; }
   if (g.outside || pod.y < g.h - 30 || pod.y < -80) { pod.resetReason = 'fell'; return; }
   // Stuck = trying to move (throttle or pressed against a wall) but staying within stuckDist of the
-  // same spot for stuckTime. Spinning on the spot, stalls, countdown and penalties don't count.
+  // same spot for stuckTime. Spinning on the spot, countdown and penalties don't count.
   const wantsMove = (Math.abs(pod.cmdL) + Math.abs(pod.cmdR)) / 2 > 0.2;
   const trying = (wantsMove || pod.touching) && Math.abs(pod.yawRate) < 0.8;
   const moved = Math.hypot(pod.x - pod.stuckX, pod.z - pod.stuckZ) > W.stuckDist;
-  if (pod.locked || pod.penalty > 0 || pod.stall > 0 || !trying || moved) {
+  if (pod.locked || pod.penalty > 0 || !trying || moved) {
     pod.stuckT = 0; pod.stuckX = pod.x; pod.stuckZ = pod.z;
   } else {
     pod.stuckT += dt;
@@ -119,8 +115,7 @@ export function checkReset(pod, g, track, dt) {
 // ============================================================================
 //  Pod-to-pod collisions. Each pod is two circles (engines + cockpit). Contacts
 //  are resolved with a 2D rigid-body impulse using mass and yaw inertia, so a
-//  hit away from the centre spins the pod. The pod hit in the SIDE gains heat
-//  (ramming someone toward overheat is a tactic); the rammer gains a little.
+//  hit away from the centre spins the pod.
 // ============================================================================
 function circles(pod, out) {
   const B = CONFIG.bump, fx = Math.sin(pod.yaw), fz = Math.cos(pod.yaw);
@@ -177,13 +172,9 @@ function resolvePair(A, Bp, c) {
   // who rammed whom: the pod closing faster on the other is the attacker
   const vi = -vn;
   const closeA = -(A.vx * nx + A.vz * nz), closeB = Bp.vx * nx + Bp.vz * nz; // (pre-impulse approx is fine)
-  const sideness = (pod) => Math.abs(nx * -Math.cos(pod.yaw) + nz * Math.sin(pod.yaw)); // |n . right|
   const [att, vic] = closeA >= closeB ? [A, Bp] : [Bp, A];
-  const heat = K.sideHeat * vi * sideness(vic);
-  vic.heat = Math.min(1, vic.heat + heat);
-  att.heat = Math.min(1, att.heat + heat * K.attackerHeat);
   if (vi >= K.hitEventMin) {
-    vic.events.push({ type: 'bump', speed: vi, victim: true, heat, other: att.slot, x: c.px, z: c.pz });
-    att.events.push({ type: 'bump', speed: vi, victim: false, heat: heat * K.attackerHeat, other: vic.slot, x: c.px, z: c.pz });
+    vic.events.push({ type: 'bump', speed: vi, victim: true, other: att.slot, x: c.px, z: c.pz });
+    att.events.push({ type: 'bump', speed: vi, victim: false, other: vic.slot, x: c.px, z: c.pz });
   }
 }

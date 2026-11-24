@@ -19,7 +19,7 @@ import { collidePods } from '../physics/collisions.js';
 import { updateSlipstream } from '../physics/skill.js';
 import { Minimap } from '../ui/minimap.js';
 import { Results } from '../ui/results.js';
-import { resetHeat, launch } from '../physics/heat.js';
+import { resetBoost } from '../physics/boost.js';
 
 const lerp = (a, b, t) => a + (b - a) * t;
 
@@ -140,7 +140,7 @@ export class Game {
 
   resetToStart(p) {
     placePod(p.pod, this.track.gridSlot(p.gridIndex), CONFIG.hover.rideHeight);
-    resetHeat(p.pod, p.input && p.input.ventCount || 0);
+    resetBoost(p.pod);
     p.lap.reset();
     p.cam.snap();
   }
@@ -155,7 +155,7 @@ export class Game {
     p.hud.event({ type: 'reset', text: reason === 'stuck' ? 'STUCK - RESET' : reason === 'manual' ? 'RESET' : 'OUT OF BOUNDS' }, performance.now());
   }
 
-  // Back to the grid with a fresh timed-start countdown.
+  // Back to the grid with a fresh countdown.
   restart() {
     this.players.forEach((p) => this.resetToStart(p));
     this.resetRace();
@@ -171,7 +171,7 @@ export class Game {
 
   go() {
     this.cdLeft = 0; this.goUntil = performance.now() + 900; this.goTime = this.time;
-    this.players.forEach((p) => launch(p.pod));
+    this.players.forEach((p) => { p.pod.locked = false; });
   }
 
   resetToCheckpoint(p) {
@@ -209,12 +209,12 @@ export class Game {
       else if (p.slot < 0 || (first && this.keyboard.active)) { inp = this.keyboard.input(); src = 'kb'; }
       else {
         const phone = this.inputs.get(p.slot);
-        inp = { l: phone.l, r: phone.r, od: phone.od, vent: phone.vent, ventCount: phone.ventCount, assist: phone.assist, t: phone.t, seq: phone.seq };
+        inp = { l: phone.l, r: phone.r, od: phone.od, assist: phone.assist, t: phone.t, seq: phone.seq };
         src = 'phone';
       }
     }
     p.pad = src === 'pad'; p.keyboard = src === 'kb';
-    if (src !== p.src) { p.src = src; p.pod.lastVentCount = inp.ventCount; } // each device has its own vent counter
+    p.src = src;
     return inp;
   }
 
@@ -312,7 +312,7 @@ export class Game {
       s.yaw = lerpAngle(pod.pyaw, pod.yaw, alpha);
       s.pitch = lerp(pod.ppitch, pod.pitch, alpha); s.roll = lerp(pod.proll, pod.roll, alpha);
       s.vx = pod.vx; s.vz = pod.vz; s.speed = pod.speed; s.engL = pod.engL; s.engR = pod.engR;
-      s.slipstream = pod.slipstream; s.heat = pod.heat; s.stall = pod.stall;
+      s.slipstream = pod.slipstream; s.boost = pod.boost;
       s.airborne = pod.airborne; s.contact = pod.contact; s.slip = pod.slip; s.surface = pod.surface; s.groundH = pod.ground.h;
       p.mesh.update(s, now / 1000);
       this.dust.emit(p, s, frameDt);
@@ -321,7 +321,7 @@ export class Game {
         this.onPodEvent(p, e, s);
       }
       pod.events.length = 0;
-      this.heatFx(p, s, frameDt, now);
+      this.podFx(p, s, frameDt, now);
     });
     this.dust.update(frameDt);
     this.standings();
@@ -363,25 +363,9 @@ export class Game {
     if (e.type === 'land') {
       p.cam.addShake(0.3 + e.loss * 3);
       if (p.pad && e.loss > 0.03) gamepads.rumble(p.padState, Math.min(1, 0.3 + e.loss * 2), 200);
-    } else if (e.type === 'vent') {
-      const perfect = e.kind === 'perfect', n = perfect ? 34 : e.kind === 'green' ? 4 : 16;
-      for (const side of [-1, 1]) for (let i = 0; i < n / 2; i++) {
-        const [x, y, z] = this.nozzle(s, side, 1.5);
-        const a = Math.random() * Math.PI * 2, sp = 3 + Math.random() * (perfect ? 9 : 5);
-        this.dust.puff(x, y, z, s.vx * 0.5 + Math.cos(a) * sp, 1 + Math.random() * 3, s.vz * 0.5 + Math.sin(a) * sp,
-          perfect ? '#d8f6ff' : '#f4f4f4', 0.7 + Math.random() * 0.5, 1.2, perfect ? 7 : 4, 0.55);
-      }
-      if (e.kind !== 'green') p.cam.addShake(perfect ? 0.5 : 0.2);
-      buzz(perfect ? 'perfect' : 'vent');
-      if (p.pad) gamepads.rumble(p.padState, perfect ? 1 : 0.4, perfect ? 260 : 120);
-    } else if (e.type === 'overheat' || e.type === 'flood') {
-      for (let i = 0; i < 40; i++) {
-        const [x, y, z] = this.nozzle(s, i % 2 ? 1 : -1, 1.5);
-        this.dust.puff(x, y, z, (Math.random() - 0.5) * 8, 2 + Math.random() * 5, (Math.random() - 0.5) * 8, '#2b2623', 1.2 + Math.random(), 1.5, 8, 0.6);
-      }
-      p.cam.addShake(0.9);
-      buzz('overheat');
-      if (p.pad) gamepads.rumble(p.padState, 1, 500);
+    } else if (e.type === 'boostEmpty') {
+      p.cam.addShake(0.3);
+      if (p.pad) gamepads.rumble(p.padState, 0.5, 250);
     } else if (e.type === 'wall') {
       const sp = e.speed, rock = e.kind === 'pillar' ? '#b56236' : '#a8572c';
       const sparks = Math.min(36, Math.round(sp * 1.1)), y = s.y - 0.2;
@@ -414,23 +398,12 @@ export class Game {
       if (e.victim) for (let i = 0; i < Math.min(20, e.speed); i++) {
         this.dust.puff(e.x, s.y, e.z, (Math.random() - 0.5) * 10, 1 + Math.random() * 4, (Math.random() - 0.5) * 10, Math.random() < 0.5 ? '#ffd27a' : '#ff9a3a', 0.3, 0.3, 0, 1);
       }
-    } else if (e.type === 'launch') {
-      p.cam.addShake(0.6);
-      if (p.pad) gamepads.rumble(p.padState, 0.8, 300);
     }
   }
 
-  // Continuous heat effects: smoke while stalled / near red, plus phone tint/state updates.
-  heatFx(p, s, dt, now) {
+  // Continuous effects: wake, scrape sparks, phone state, countdown banner.
+  podFx(p, s, dt, now) {
     const pod = p.pod;
-    const rate = pod.stall > 0 ? 45 : pod.heat > 0.9 ? 10 : pod.locked && pod.heat > 0.75 ? 8 : 0;
-    p.smokeAcc = (p.smokeAcc || 0) + rate * dt;
-    while (p.smokeAcc >= 1) {
-      p.smokeAcc -= 1;
-      const [x, y, z] = this.nozzle(s, Math.random() < 0.5 ? -1 : 1, 2.2);
-      this.dust.puff(x, y + 0.2, z, s.vx * 0.4 + (Math.random() - 0.5) * 2, 1.5 + Math.random() * 2, s.vz * 0.4 + (Math.random() - 0.5) * 2,
-        pod.stall > 0 ? '#2b2623' : '#6b625b', 1.0 + Math.random() * 0.8, 1, 5, pod.stall > 0 ? 0.55 : 0.35);
-    }
     // wake behind every fast pod (stronger when someone is drafting in it)
     if (s.speed > 30 && !pod.airborne) {
       const k = Math.min(1, s.speed / 70) * CONFIG.fx.wakeRate + pod.wakeFollowed * CONFIG.fx.wakeRate * 2.5;
@@ -454,19 +427,18 @@ export class Game {
           Math.random() < 0.5 ? '#ffd27a' : '#ff9a3a', 0.2 + Math.random() * 0.25, 0.3, 0, 1);
       }
     }
-    // phone state at ~15 Hz (background tint, vent button)
+    // phone state at ~15 Hz (phone UI is parked: heat/vent fields stay neutral so it keeps working)
     p.fxT = (p.fxT || 0) + dt;
     if (p.slot >= 0 && p.fxT > 1 / 15) {
       p.fxT = 0;
-      this.sendFx(p.slot, { t: 'fx', h: Math.round(pod.heat * 100), s: pod.stall > 0 ? 1 : 0, b: pod.boost > 0.5 ? 1 : 0,
-        v: Math.round((1 - pod.ventCd / CONFIG.heat.ventCooldown) * 100), c: this.cdLeft > 0 ? 1 : 0, e: this.results ? 1 : 0 });
+      this.sendFx(p.slot, { t: 'fx', h: 0, s: 0, b: pod.boost > 0.5 ? 1 : 0, v: 100, c: this.cdLeft > 0 ? 1 : 0, e: this.results ? 1 : 0 });
     }
     // countdown / GO banner
     let cd = { text: '' };
     if (pod.penalty > 0) cd = { text: `RESET ${pod.penalty.toFixed(1)}`, kind: 'ready' };
     else if (this.cdLeft > 0) {
       const t = this.cdLeft;
-      cd = t > 3 ? { text: 'READY', kind: 'ready', window: true } : { text: String(Math.ceil(t)), window: true };
+      cd = t > 3 ? { text: 'READY', kind: 'ready' } : { text: String(Math.ceil(t)) };
     } else if (now < this.goUntil) cd = { text: 'GO!', kind: 'go' };
     p.hud.setCountdown(cd);
   }
