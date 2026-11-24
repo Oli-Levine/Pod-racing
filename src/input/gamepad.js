@@ -6,7 +6,7 @@ import { CONFIG } from '../../config.js';
 //  Polled once per frame. Two ways to drive, use either:
 //    Sticks (tank):  left stick up/down = left engine, right stick = right engine
 //    Triggers:       LT / RT = left / right engine forward, LB / RB = reverse
-//  Buttons:  A join (lobby) / vent (race)   B leave (lobby)   X boost   L3/R3 overdrive per side
+//  Buttons:  A join (lobby)   B leave (lobby) / back to lobby (results)   X boost   L3/R3 overdrive per side
 //            Y assist on/off   View reset to checkpoint   Menu start / race again
 //  Browsers only reveal a controller after you press a button on it once.
 // ============================================================================
@@ -17,14 +17,14 @@ const NAMES = Object.fromEntries(Object.entries(B).map(([k, v]) => [v, k]));
 class PadState {
   constructor(index) {
     this.index = index; this.key = 'pad' + index; this.id = '';
-    this.l = 0; this.r = 0; this.od = 0; this.vent = false; this.ventCount = 0;
+    this.l = 0; this.r = 0; this.od = 0;
     this.assist = false; this.lastUse = -1e9; this.connected = false; this.prev = [];
   }
 
   get active() { return this.connected && performance.now() - this.lastUse < 1500; }
 
   input() {
-    return { l: this.l, r: this.r, od: this.od, vent: this.vent, ventCount: this.ventCount, assist: this.assist, gamepad: true };
+    return { l: this.l, r: this.r, od: this.od, assist: this.assist, gamepad: true };
   }
 }
 
@@ -62,7 +62,7 @@ class Gamepads {
       seen.add(gp.index);
       this.read(this.get(gp.index), gp);
     }
-    for (const p of this.pads.values()) if (!seen.has(p.index)) { p.connected = false; p.l = p.r = 0; p.od = 0; p.vent = false; }
+    for (const p of this.pads.values()) if (!seen.has(p.index)) { p.connected = false; p.l = p.r = 0; p.od = 0; }
   }
 
   read(st, p) {
@@ -83,13 +83,11 @@ class Gamepads {
     st.l = pick(stick(1), trig(B.LT, B.LB));
     st.r = pick(stick(3), trig(B.RT, B.RB));
     st.od = (btn(B.X).pressed ? 3 : 0) | (btn(B.L3).pressed ? 1 : 0) | (btn(B.R3).pressed ? 2 : 0);
-    st.vent = btn(B.A).pressed;
 
     let used = Math.abs(st.l) > 0.02 || Math.abs(st.r) > 0.02;
     p.buttons.forEach((b, i) => {
       if (b.pressed && !st.prev[i]) {
         used = true;
-        if (i === B.A) st.ventCount++;
         if (i === B.Y) st.assist = !st.assist;
         for (const f of this.listeners) f(NAMES[i] || `B${i}`, st);
       }

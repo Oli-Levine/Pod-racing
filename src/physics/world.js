@@ -1,18 +1,18 @@
 import { CONFIG } from '../../config.js';
 import { savePrev } from './pod.js';
 import { updateEngines, applyHandling } from './handling.js';
-import { updateHeat, applyKick } from './heat.js';
+import { updateBoost, applyKick } from './boost.js';
 import { updateSlide } from './skill.js';
 import { collide, checkReset } from './collisions.js';
 import { applyHover, resolveVertical, updateVisualTilt } from './hover.js';
 
 // One fixed physics step for one pod.
-// input: { l, r, od, vent, assist }  (l/r = -0.4..1 from the phone or keyboard)
+// input: { l, r, od, assist }  (l/r = -0.4..1 from the gamepad, phone or keyboard)
 export function stepPod(pod, input, track, dt) {
   savePrev(pod);
   pod.assist = !!input.assist;
   const g = track.groundWithSlope(pod.x, pod.z, pod.ground);
-  updateHeat(pod, input, dt);
+  updateBoost(pod, input, dt);
   updateEngines(pod, { l: pod.cmdL, r: pod.cmdR }, dt);
   applyHover(pod, g, dt);
   applyHandling(pod, g, dt);

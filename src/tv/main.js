@@ -137,7 +137,8 @@ keepAwake();
 
 // ---- Controllers -------------------------------------------------------------------------
 // Lobby: A = join as a player, B = leave, Menu = join + start.
-// Race:  Menu = race again (results screen) / restart (solo), View = back to last checkpoint.
+// Race:  Menu = race again (results screen) / restart (solo), View = back to last checkpoint,
+//        B (results screen) = back to the lobby.
 const padJoined = (st) => !!(snap && snap.players.some((p) => p.local === st.key));
 let padToastShown = false;
 gamepads.onButton((b, st) => {
@@ -148,6 +149,7 @@ gamepads.onButton((b, st) => {
     if (b === 'MENU') actions.force();
   } else if (game) {
     if (b === 'MENU' && (game.results || game.solo)) game.restart();
+    else if (b === 'B' && game.results) actions.lobby();
     else if (b === 'VIEW') game.resetByPad(st);
   }
 });

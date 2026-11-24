@@ -2,7 +2,7 @@
 // travel in a different direction to where it faces.
 //   forward = (sin yaw, 0, cos yaw), right = (-cos yaw, 0, sin yaw)
 //   yaw increasing = turning LEFT. yawRate < 0 = turning right.
-import { initHeat } from './heat.js';
+import { initBoost } from './boost.js';
 
 export function createPod(slot) {
   const pod = {
@@ -22,11 +22,11 @@ export function createPod(slot) {
     px: 0, py: 0, pz: 0, pyaw: 0, ppitch: 0, proll: 0,
     events: [],                // landing / lap events for HUD + effects, drained by the game
     assist: false,
-    charge: 0, slideState: 'idle', slideOverT: 0, slipstream: 0, dragMult: 1, slipCool: 0, wakeFollowed: 0,
+    charge: 0, slideState: 'idle', slideOverT: 0, slipstream: 0, dragMult: 1, wakeFollowed: 0,
     touching: false, wallNx: 0, wallNz: 0, scrape: 0, hitCd: 0, stuckT: 0, stuckX: 0, stuckZ: 0, penalty: 0, resetReason: null,
     ground: {},
   };
-  initHeat(pod);
+  initBoost(pod);
   return pod;
 }
 

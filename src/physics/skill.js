@@ -10,13 +10,12 @@ const DEG = 180 / Math.PI;
 export function updateSlide(pod, dt) {
   const S = CONFIG.slide;
   const slipDeg = Math.abs(pod.slip) * DEG;
-  const ok = !pod.airborne && pod.contact > 0.7 && pod.speed >= S.minSpeed && !pod.locked && pod.penalty <= 0 && pod.stall <= 0
+  const ok = !pod.airborne && pod.contact > 0.7 && pod.speed >= S.minSpeed && !pod.locked && pod.penalty <= 0
     && pod.cmdL >= S.minThrust && pod.cmdR >= S.minThrust;
   let state = 'idle';
 
   if (ok && slipDeg >= S.bandLow && slipDeg <= S.bandHigh) {
     pod.charge = Math.min(1, pod.charge + S.chargeRate * dt);
-    pod.heat = Math.min(1, pod.heat + S.heatRate * dt);
     pod.slideOverT = 0;
     state = 'charging';
   } else if (ok && slipDeg > S.bandHigh) {
@@ -69,7 +68,6 @@ export function updateSlipstream(pods, dt) {
     const rate = target > p.slipstream ? 1 / W.buildTime : 1 / W.fadeTime;
     p.slipstream += Math.sign(target - p.slipstream) * Math.min(Math.abs(target - p.slipstream), rate * dt);
     p.dragMult = 1 - W.dragCut * p.slipstream;
-    p.slipCool = W.cooling * p.slipstream;
     if (leader && p.slipstream > 0.15) leader.wakeFollowed = Math.max(leader.wakeFollowed, p.slipstream);
   }
 }
